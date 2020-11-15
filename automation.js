@@ -18,7 +18,7 @@ function delay(time) {
 
 function getRandomComment() {
     let comments = document.querySelector('div#replyList').querySelectorAll('pre');
-    let comment = comments[Math.random() * comments.length];
+    let comment = comments[Math.random() * comments.length | 0];
     return comment ? comment.innerText : null;
 }
 
