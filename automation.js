@@ -26,43 +26,65 @@ function canComment() {
     return document.querySelector('div.mi-reply-panel').children.length === 2;
 }
 
-async function doComment(comment) {
+function doComment(comment) {
     document.querySelector('div.mi-reply-panel').children[1].click();
-    await delay(500);
-    document.querySelector('textarea#ReplyContent').value = comment;
-    // post the comment
-    document.querySelector('div.mi-edit-panel.bottom').lastElementChild.click();
-    await delay(1000);
+    return delay(500)
+        .then(() => document.querySelector('textarea#ReplyContent').value = comment)
+        .then(() => {
+            // post the comment
+            document.querySelector('div.mi-edit-panel.bottom').lastElementChild.click();
+            return delay(1000);
+        });
 }
 
-async function likeAllPosts(needComment) {
+function likeAllPosts(needComment) {
     // find all posts
     let posts = document.querySelectorAll('div.list-group-item.ui-1-article > a');
     console.log('number of posts: ' + posts.length);
+    return new Promise(resolve => {
+        likePostRecursive(posts, 0, resolve);
+    });
 
-    for (let post of posts) {
-        // check if this is a new post
-        if (post.querySelector('span.ui-1-tag.mi-q-new')) {
-            post.click();
-            await delay(1500)
-            // check if already liked
-            let likeButton = document.querySelector('div.mi-reply-panel > a');
-            if (likeButton.querySelector('span#cmdLike').innerText === '点赞') {
-                likeButton.click();
-                await delay(500)
-                // check if we need to comment the post
-                if (needComment && canComment()) {
-                    let comment = getRandomComment();
-                    if (!comment) {
-                        do {
-                            comment = prompt('Please enter the comment', '');
-                        } while (!comment);
+    function likePostRecursive(posts, i, done) {
+        if (i < posts.length) {
+            // check if this is a new post
+            if (posts[i].querySelector('span.ui-1-tag.mi-q-new')) {
+                new Promise(resolve => {
+                    // show the post
+                    posts[i].click();
+                    resolve();
+                }).then(() => {
+                    return delay(1500)
+                }).then(() => {
+                    // check if already liked
+                    let likeButton = document.querySelector('div.mi-reply-panel > a');
+                    if (likeButton.querySelector('span#cmdLike').innerText === '点赞') {
+                        likeButton.click();
+                        return delay(500)
+                            .then(() => {
+                                // check if we need to comment the post
+                                if (needComment && canComment()) {
+                                    let comment = getRandomComment();
+                                    if (!comment) {
+                                        do {
+                                            comment = prompt('Please enter the comment', '');
+                                        } while (!comment);
+                                    }
+                                    return doComment(comment);
+                                }
+                            });
                     }
-                    await doComment(comment);
-                }
+                }).then(() => {
+                    document.querySelector('a.mi-line-body').click();
+                    return delay(1500);
+                }).then(() => {
+                    likePostRecursive(posts, i + 1, done);
+                });
+            } else {
+                likePostRecursive(posts, i + 1, done);
             }
-            document.querySelector('a.mi-line-body').click();
-            await delay(1500);
+        } else {
+            done();
         }
     }
 }
@@ -72,40 +94,51 @@ function back() {
     return delay(1500);
 }
 
-async function visitNotices(needComment) {
-    document.querySelector('span.iconfont.if-icon.if-icon-notice').click();
-    await delay(1500);
-    document.querySelector('span.ui-1-sub-header-more').click();
-    await delay(1500);
-    await likeAllPosts(needComment);
-    await back();
-    await back();
+function visitNotices(needComment) {
+    let button = document.querySelector('span.iconfont.if-icon.if-icon-notice');
+    button.click();
+    return delay(1500)
+        .then(() => {
+            document.querySelector('span.ui-1-sub-header-more').click();
+            return delay(1500);
+        })
+        .then(() => likeAllPosts(needComment))
+        .then(() => back())
+        .then(() => back());
 }
 
-async function visitMyNeighbors(needComment) {
-    document.querySelector('span.iconfont.if-icon.if-icon-around').click();
-    await delay(1500);
-    await likeAllPosts(needComment);
-    await back();
+function visitMyNeighbors(needComment) {
+    let button = document.querySelector('span.iconfont.if-icon.if-icon-around');
+    button.click();
+    return delay(1500)
+        .then(() => likeAllPosts(needComment))
+        .then(() => back());
 }
 
-async function visitPartyArea() {
-    document.querySelector('span.iconfont.if-icon.if-icon-ccp').click();
-    await delay(1500);
-    document.querySelector('span.ui-1-sub-header-more').click();
-    await delay(1500);
-    await likeAllPosts(false);
-    await back();
-    await back();
+function visitPartyArea() {
+    let button = document.querySelector('span.iconfont.if-icon.if-icon-ccp');
+    button.click();
+    return delay(1500)
+        .then(() => {
+            document.querySelector('span.ui-1-sub-header-more').click();
+            return delay(1500);
+        })
+        .then(() => likeAllPosts(false))
+        .then(() => back())
+        .then(() => back());
 }
 
-async function changeMember(i) {
+function changeMember(i) {
     document.querySelector('a#showChangeMember').click();
-    await delay(1000);
-    let members = document.querySelector('div.van-cell-group.van-hairline--top-bottom');
-    members.children[i].click();
-    await delay(1000);
-    document.querySelector('div.sqt-lib-roles-foot').lastElementChild.click();
+    return delay(1000)
+        .then(() => {
+            let members = document.querySelector('div.van-cell-group.van-hairline--top-bottom');
+            members.children[i].click();
+            return delay(1000);
+        })
+        .then(() => {
+            document.querySelector('div.sqt-lib-roles-foot').lastElementChild.click();
+        });
 }
 
 /*
