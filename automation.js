@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like All New Posts
 // @author  ashen
-// @version 1
+// @version 2
 // @grant    none
 // @match https://www.juweitong.cn/*
 // ==/UserScript==
@@ -14,6 +14,28 @@ function delay(time) {
     return new Promise(resolve => {
         setTimeout(resolve, time);
     });
+}
+
+function waitUntilCondition(cond) {
+    return new Promise(resolve => {
+        // repeatedly checking the condition
+        let timer = setInterval(() => {
+            if (cond()) {
+                resolve();
+                clearInterval(timer);
+            }
+        }, 100);
+    })
+}
+
+function waitUntilLoadingFinishes() {
+    return waitUntilCondition(() => !unsafeWindow.g_isLoading)
+        .then(() => delay(500));
+}
+
+function waitUntilPageAttached() {
+    return waitUntilCondition(() => unsafeWindow.g_attached)
+        .then(() => delay(500));
 }
 
 function getRandomComment() {
@@ -54,7 +76,7 @@ function likeAllPosts(needComment) {
                     posts[i].click();
                     resolve();
                 }).then(() => {
-                    return delay(1500)
+                    return waitUntilLoadingFinishes();
                 }).then(() => {
                     // check if already liked
                     let likeButton = document.querySelector('div.mi-reply-panel > a');
@@ -76,7 +98,7 @@ function likeAllPosts(needComment) {
                     }
                 }).then(() => {
                     document.querySelector('a.mi-line-body').click();
-                    return delay(1500);
+                    return waitUntilLoadingFinishes();
                 }).then(() => {
                     likePostRecursive(posts, i + 1, done);
                 });
@@ -84,23 +106,26 @@ function likeAllPosts(needComment) {
                 likePostRecursive(posts, i + 1, done);
             }
         } else {
+            console.log('finish liking posts');
             done();
         }
     }
 }
 
 function back() {
+    unsafeWindow.g_attached = false;
     document.querySelector('a.back').click();
-    return delay(1500);
+    return waitUntilLoadingFinishes();
 }
 
 function visitNotices(needComment) {
+    console.log('visit notices');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-notice');
     button.click();
-    return delay(1500)
+    return waitUntilLoadingFinishes()
         .then(() => {
             document.querySelector('span.ui-1-sub-header-more').click();
-            return delay(1500);
+            return waitUntilLoadingFinishes();
         })
         .then(() => likeAllPosts(needComment))
         .then(() => back())
@@ -108,20 +133,22 @@ function visitNotices(needComment) {
 }
 
 function visitMyNeighbors(needComment) {
+    console.log('visit my neighbors');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-around');
     button.click();
-    return delay(1500)
+    return waitUntilLoadingFinishes()
         .then(() => likeAllPosts(needComment))
         .then(() => back());
 }
 
 function visitPartyArea() {
+    console.log('visit party area');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-ccp');
     button.click();
-    return delay(1500)
+    return waitUntilLoadingFinishes()
         .then(() => {
             document.querySelector('span.ui-1-sub-header-more').click();
-            return delay(1500);
+            return waitUntilLoadingFinishes();
         })
         .then(() => likeAllPosts(false))
         .then(() => back())
@@ -162,11 +189,45 @@ function visitAllCommunities() {
 }*/
 
 document.addEventListener('keydown', evt => {
+    if (!unsafeWindow.g_isPatched) {
+        console.log('patching');
+
+        var script = unsafeWindow.document.createElement('script');
+        script.type = 'text/javascript';
+        script.innerText = "\
+			let orgOnAttached = mi.page.onAttached;\
+			mi.page.onAttached = function () {\
+                console.log('Page attached');\
+                g_attached = true;\
+                return orgOnAttached.apply(mi.page, arguments);\
+    		};\
+            let orgLoadingToast = mi.loadingToast;\
+            mi.loadingToast = function () {\
+                console.log('Loading ' + Date.now());\
+                g_isLoading = true;\
+                let t = orgLoadingToast.apply(mi, arguments);\
+                let orgHide = t.hide;\
+                t.hide = function () {\
+                    console.log('Loading finished ' + Date.now());\
+                    g_isLoading = false;\
+                    return orgHide.apply(t, arguments);\
+                };\
+                return t;\
+            };";
+        unsafeWindow.document.getElementsByTagName('head')[0].appendChild(script);
+
+        unsafeWindow.g_isPatched = true;
+        console.log('patched');
+    }
+
     if (evt.ctrlKey && evt.key === '1') {
         let needComment = confirm('Need commenting?');
         visitNotices(needComment)
+            .then(() => waitUntilPageAttached())
             .then(() => visitMyNeighbors(needComment))
+            .then(() => waitUntilPageAttached())
             .then(() => visitPartyArea())
+            .then(() => waitUntilPageAttached())
             .then(() => alert('Finished'));
     }
     if (evt.altKey && evt.code.startsWith('Digit')) {
@@ -176,3 +237,4 @@ document.addEventListener('keydown', evt => {
         }
     }
 });
+
