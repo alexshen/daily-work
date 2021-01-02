@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like All New Posts
 // @author  ashen
-// @version 2
+// @version 3
 // @grant    none
 // @match https://www.juweitong.cn/*
 // ==/UserScript==
@@ -39,9 +39,12 @@ async function waitUntilPageAttached() {
 }
 
 function getRandomComment() {
-    let comments = document.querySelector('div#replyList').querySelectorAll('pre');
-    let comment = comments[Math.random() * comments.length | 0];
-    return comment ? comment.innerText : null;
+    let comments = document.querySelector('div#replyList')?.querySelectorAll('pre');
+    if (comments) {
+        let comment = comments[Math.random() * comments.length | 0];
+        return comment ? comment.innerText : null;
+    }
+    return null;
 }
 
 function canComment() {
