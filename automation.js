@@ -28,14 +28,14 @@ function waitUntilCondition(cond) {
     })
 }
 
-function waitUntilLoadingFinishes() {
-    return waitUntilCondition(() => !unsafeWindow.g_isLoading)
-        .then(() => delay(500));
+async function waitUntilLoadingFinishes() {
+    await waitUntilCondition(() => !unsafeWindow.g_isLoading);
+    return await delay(500);
 }
 
-function waitUntilPageAttached() {
-    return waitUntilCondition(() => unsafeWindow.g_attached)
-        .then(() => delay(500));
+async function waitUntilPageAttached() {
+    await waitUntilCondition(() => unsafeWindow.g_attached);
+    return await delay(500);
 }
 
 function getRandomComment() {
@@ -48,124 +48,98 @@ function canComment() {
     return document.querySelector('div.mi-reply-panel').children.length === 2;
 }
 
-function doComment(comment) {
+async function doComment(comment) {
     document.querySelector('div.mi-reply-panel').children[1].click();
-    return delay(500)
-        .then(() => document.querySelector('textarea#ReplyContent').value = comment)
-        .then(() => {
-            // post the comment
-            document.querySelector('div.mi-edit-panel.bottom').lastElementChild.click();
-            return delay(1000);
-        });
+    await delay(500);
+    document.querySelector('textarea#ReplyContent').value = comment;
+    // post the comment
+    document.querySelector('div.mi-edit-panel.bottom').lastElementChild.click();
+    return await delay(1000);
 }
 
-function likeAllPosts(needComment) {
-    // find all posts
-    let posts = document.querySelectorAll('div.list-group-item.ui-1-article > a');
-    console.log('number of posts: ' + posts.length);
-    return new Promise(resolve => {
-        likePostRecursive(posts, 0, resolve);
-    });
-
-    function likePostRecursive(posts, i, done) {
-        if (i < posts.length) {
-            // check if this is a new post
-            if (posts[i].querySelector('span.ui-1-tag.mi-q-new')) {
-                new Promise(resolve => {
-                    // show the post
-                    posts[i].click();
-                    resolve();
-                }).then(() => {
-                    return waitUntilLoadingFinishes();
-                }).then(() => {
-                    // check if already liked
-                    let likeButton = document.querySelector('div.mi-reply-panel > a');
-                    if (likeButton.querySelector('span#cmdLike').innerText === '点赞') {
-                        likeButton.click();
-                        return delay(500)
-                            .then(() => {
-                                // check if we need to comment the post
-                                if (needComment && canComment()) {
-                                    let comment = getRandomComment();
-                                    if (!comment) {
-                                        do {
-                                            comment = prompt('Please enter the comment', '');
-                                        } while (!comment);
-                                    }
-                                    return doComment(comment);
-                                }
-                            });
-                    }
-                }).then(() => {
-                    document.querySelector('a.mi-line-body').click();
-                    return waitUntilLoadingFinishes();
-                }).then(() => {
-                    likePostRecursive(posts, i + 1, done);
-                });
-            } else {
-                likePostRecursive(posts, i + 1, done);
+async function likePost(post, needComment) {
+    // check if this is a new post
+    if (post.querySelector('span.ui-1-tag.mi-q-new')) {
+        // show the post
+        post.click();
+        await waitUntilLoadingFinishes();
+        // check if already liked
+        let likeButton = document.querySelector('div.mi-reply-panel > a');
+        if (likeButton.querySelector('span#cmdLike').innerText === '点赞') {
+            likeButton.click();
+            await delay(500);
+            // check if we need to comment the post
+            if (needComment && canComment()) {
+                let comment = getRandomComment();
+                if (!comment) {
+                    do {
+                        comment = prompt('Please enter the comment', '');
+                    } while (!comment);
+                }
+                await doComment(comment);
             }
-        } else {
-            console.log('finish liking posts');
-            done();
         }
+        document.querySelector('a.mi-line-body').click();
+        await waitUntilLoadingFinishes();
     }
 }
 
-function back() {
-    unsafeWindow.g_attached = false;
-    document.querySelector('a.back').click();
-    return waitUntilLoadingFinishes();
+async function likeAllPosts(needComment) {
+    // find all posts
+    let posts = document.querySelectorAll('div.list-group-item.ui-1-article > a');
+    console.log('number of posts: ' + posts.length);
+    for (let post of posts) {
+        await likePost(post, needComment);
+    }
+    console.log('finish liking posts');
 }
 
-function visitNotices(needComment) {
+async function back() {
+    unsafeWindow.g_attached = false;
+    document.querySelector('a.back').click();
+    await waitUntilLoadingFinishes();
+}
+
+async function visitNotices(needComment) {
     console.log('visit notices');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-notice');
     button.click();
-    return waitUntilLoadingFinishes()
-        .then(() => {
-            document.querySelector('span.ui-1-sub-header-more').click();
-            return waitUntilLoadingFinishes();
-        })
-        .then(() => likeAllPosts(needComment))
-        .then(() => back())
-        .then(() => back());
+    await waitUntilLoadingFinishes();
+    document.querySelector('span.ui-1-sub-header-more').click();
+    await waitUntilLoadingFinishes();
+    await likeAllPosts(needComment);
+    await back();
+    return await back();
 }
 
-function visitMyNeighbors(needComment) {
+async function visitMyNeighbors(needComment) {
     console.log('visit my neighbors');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-around');
     button.click();
-    return waitUntilLoadingFinishes()
-        .then(() => likeAllPosts(needComment))
-        .then(() => back());
+    await waitUntilLoadingFinishes();
+    await likeAllPosts(needComment);
+    return await back();
 }
 
-function visitPartyArea() {
+async function visitPartyArea() {
     console.log('visit party area');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-ccp');
     button.click();
-    return waitUntilLoadingFinishes()
-        .then(() => {
-            document.querySelector('span.ui-1-sub-header-more').click();
-            return waitUntilLoadingFinishes();
-        })
-        .then(() => likeAllPosts(false))
-        .then(() => back())
-        .then(() => back());
+    await waitUntilLoadingFinishes();
+    document.querySelector('span.ui-1-sub-header-more').click();
+    await waitUntilLoadingFinishes();
+    await likeAllPosts(false);
+    await back();
+    return await back();
 }
 
-function changeMember(i) {
+async function changeMember(i) {
     document.querySelector('a#showChangeMember').click();
-    return delay(1000)
-        .then(() => {
-            let members = document.querySelector('div.van-cell-group.van-hairline--top-bottom');
-            members.children[i].click();
-            return delay(1000);
-        })
-        .then(() => {
-            document.querySelector('div.sqt-lib-roles-foot').lastElementChild.click();
-        });
+    await delay(1000);
+    let members = document.querySelector('div.van-cell-group.van-hairline--top-bottom');
+    members.children[i].click();
+    await delay(1000);
+    document.querySelector('div.sqt-lib-roles-foot').lastElementChild.click();
 }
 
 /*
