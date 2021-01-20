@@ -8,8 +8,6 @@
 // @match https://www.juweitong.cn/*
 // ==/UserScript==
 
-const NUM_COMMUNITIES = 4;
-
 function delay(time) {
     return new Promise(resolve => {
         setTimeout(resolve, time);
