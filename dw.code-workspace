@@ -4,5 +4,8 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"prettier.tabWidth": 4,
+		"prettier.printWidth": 100
+	}
 }
