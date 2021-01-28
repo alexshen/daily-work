@@ -117,6 +117,9 @@
         let subMenu = await waitUntilElementIsFound(
             `.ant-cascader-menus:not([style*="display: none"]) ul:nth-child(${i + 1})`
         );
+        if (!subMenu) {
+            throw new Erorr(`sub menu ${i} not found`);
+        }
         return Array.from(subMenu.querySelectorAll("li"));
     }
 
