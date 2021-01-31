@@ -71,19 +71,42 @@
         }
     }
 
-    async function waitUntilRequestDone(initiator) {
-        let event;
-        const handler = (e) => (event = e);
-        try {
-            XHRInterceptor.addEventListener("load", handler);
-            initiator();
-            while (!event) {
+    class RequestWaiter {
+        constructor(urlRegex) {
+            this._urlRegex = urlRegex
+            this._onResponseHandler = this._onResponse.bind(this);
+            this._wait = true;
+            XHRInterceptor.addEventListener("load", this._onResponseHandler);
+        }
+
+        wait() {
+            while (this._wait) {
                 await delay(100);
             }
-        } finally {
-            XHRInterceptor.removeEventHandler("load", handler);
         }
-        return event;
+
+        dispose() {
+            this._wait = false;
+            XHRInterceptor.removeEventHandler("load", this._onResponseHandler);
+        }
+
+        _onResponse(e) {
+            if (!this._urlRegex || e.target.responseURL.match(this._urlRegex)) {
+                this._event = e;
+                this.dispose();
+            }
+        }
+    }
+
+    // wait until the next request is finished
+    async function waitUntilRequestDone(initiator) {
+        const waiter = new RequestWaiter();
+        try {
+            initiator();
+            await waiter.wait();
+        } finally {
+            waiter.dispose();
+        }
     }
 
     function currentDialogElement() {
