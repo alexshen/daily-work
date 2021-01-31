@@ -211,14 +211,18 @@
     class FormUpdator {
         constructor() {
             const pageUI = document.querySelector("#fillingRecord");
-            this._idInput = pageUI.querySelector(
-                ".other-search > form > .ant-row:first-child > div:nth-child(2) input"
+            this._idInput = pageUI.querySelector(".other-search > form > .ant-row:first-child > div:nth-child(2) input");
+            this._isCompleteDropdown = pageUI.querySelector(
+                ".other-search > form > .ant-row:last-child div[role=combobox]"
             );
-            this._searchButton = pageUI.querySelector(
-                ".other-search > form > div:nth-child(3) > div:nth-child(2) > button:nth-child(2)"
-            );
+            this._searchButton = pageUI.querySelector(".other-search > form > .ant-row:last-child button:nth-child(2)");
+            this._resetButton = pageUI.querySelector(".other-search > form > .ant-row:last-child button:nth-child(1)");
             this._addButton = pageUI.querySelector("div.five button:first-child");
             this._tableUI = pageUI.querySelector("div.six");
+        }
+
+        async clearSearchFields() {
+            this._resetButton.click();
         }
 
         async addUser(user) {
@@ -227,15 +231,10 @@
             await this._fillForm(user);
         }
 
-        async _findUsers(idNumber) {
-            updateTextValue(this._idInput, idNumber);
-            this._searchButton.click();
-            await this._waitUntilSpinningHasFinished();
-            return this._tableUI.querySelectorAll(".ant-table-body tr");
-        }
-
         async updateUser(user) {
-            const rows = Array.from(await this._findUsers(user.idNumber));
+            this.clearSearchFields();
+            await this.filterUsers({ idNumber: user.idNumber });
+            const rows = Array.from(this.getUserRows());
             if (rows.length === 0) {
                 await this.addUser(user);
             } else {
@@ -325,6 +324,33 @@
             await delay(500);
         }
 
+        async filterUsers(criteria) {
+            if (criteria.idNumber) {
+                updateTextValue(this._idInput, criteria.idNumber || "");
+            }
+
+            if (typeof criteria.isComplete === "boolean") {
+                await this._isCompleteDropdown.click();
+                await delay(500);
+                this._getDropdownItem(criteria.isComplete ? "是" : "否").click();
+                await delay(500);
+            }
+
+            await waitUntilRequestDone(() => this._searchButton.click());
+            await this._waitUntilSpinningHasFinished();
+        }
+
+        getUserRows() {
+            return this._tableUI.querySelectorAll(".ant-table-body tr");
+        }
+
+        async deleteUser(row) {
+            row.querySelector('td:last-child a:last-child').click();
+            await delay(500);
+            const dialog = currentDialogElement();
+            await waitUntilRequestDone(() => dialog.querySelector("button:last-child").click());
+        }
+
         _getDropdownItem(text) {
             const dropdownItems = document.querySelectorAll(
                 '.ant-select-dropdown:not([style*="display: none"]) li'
@@ -387,7 +413,6 @@
         const users = await readUserRecords(filename);
         for (let i = 0; i < users.length; ++i) {
             const user = users[i];
-            user.signed = "是";
             if (await formUpdator.updateUser(user)) {
                 console.log(
                     `[${i + 1}/${users.length}] updated ${user.username} with id ${user.idNumber}`
@@ -414,6 +439,34 @@
         input.click();
     }
 
+    async function deleteIncompleteUsers() {
+        const formUpdator = new FormUpdator();
+        await formUpdator.filterUsers({ isComplete: false });
+
+        try {
+            let rows = formUpdator.getUserRows();
+            while (rows.length && !g_stop) {
+                const userRow = rows[0];
+                const listRequestWaiter = new RequestWaiter(/https?.+\/list\?.+/);
+                try {
+                    await formUpdator.deleteUser(userRow);
+
+                    const username = userRow.querySelector("td:nth-child(4)").innerText;
+                    const idNumber = userRow.querySelector("td:nth-child(5)").innerText;
+                    console.log(`deleted user ${username} with ${idNumber}`);
+
+                    await listRequestWaiter.wait();
+                } finally {
+                    listRequestWaiter.dispose();
+                }
+                rows = formUpdator.getUserRows();
+                await delay(500);
+            }
+        } finally {
+            console.log("deleting stopped");
+        }
+    }
+
     document.addEventListener("keydown", (e) => {
         if (e.altKey && e.key === "1") {
             updateUsers();
@@ -421,6 +474,13 @@
         if (e.altKey && e.key === "2") {
             g_stop = true;
             console.log("stop updating");
+        }
+        if (e.altKey && e.key === "3") {
+            deleteIncompleteUsers();
+        }
+        if (e.altKey && e.key === "4") {
+            g_stop = true;
+            console.log("stop deleting");
         }
     });
 })();
