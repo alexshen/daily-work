@@ -238,21 +238,9 @@
             if (rows.length === 0) {
                 await this.addUser(user);
             } else {
-                while (rows.length > 1) {
-                    // find and remove the duplidate row
-                    for (let i = 0; i < rows.length; ++i) {
-                        const curRow = rows[i];
-                        const filledTime = curRow.querySelector("td:last-child")
-                            .previousElementSibling.innerText;
-                        if (!filledTime) {
-                            curRow.querySelector("td:last-child a:last-child").click();
-                            await this._waitUntilSpinningHasFinished();
-                            rows.splice(i, 1);
-                            break;
+                if (rows.length > 1) {
+                    throw new Error(`duplidate user ${user}`);
                         }
-                    }
-                }
-
                 // start editing
                 const resultEvent = await waitUntilRequestDone(() => {
                     rows[0].querySelector("td:last-child a:first-child").click();
