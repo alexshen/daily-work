@@ -240,7 +240,7 @@
             } else {
                 if (rows.length > 1) {
                     throw new Error(`duplidate user ${user}`);
-                        }
+                }
                 // start editing
                 const resultEvent = await waitUntilRequestDone(() => {
                     rows[0].querySelector("td:last-child a:first-child").click();
@@ -419,7 +419,6 @@
         input.onchange = (e) => {
             updateUsersWithFile(e.target.files[0])
                 .then(() => "finished update")
-                .catch(alert)
                 .finally(() => {
                     g_stop = false;
                 });
