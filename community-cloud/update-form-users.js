@@ -79,10 +79,11 @@
             XHRInterceptor.addEventListener("load", this._onResponseHandler);
         }
 
-        wait() {
+        async wait() {
             while (this._wait) {
                 await delay(100);
             }
+            return this._event;
         }
 
         dispose() {
@@ -103,7 +104,7 @@
         const waiter = new RequestWaiter();
         try {
             initiator();
-            await waiter.wait();
+            return await waiter.wait();
         } finally {
             waiter.dispose();
         }
