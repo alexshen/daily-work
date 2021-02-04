@@ -36,13 +36,98 @@
         '4079': '智华苑小区'
     };
 
-    const COLLECTIVE_ADDRESSES = [
-        '场中路4098弄'
-    ];
+    const COLLECTIVE_ADDRESSES = {
+        '场中路4098弄': '社区相关地址/集体户口'
+    };
 
     function isLocalCommunityAddr(addr) {
         let longs = VALID_LONGS[addr[0]];
         return longs && longs.has(addr[1], 10);
+    }
+
+    class XHRInterceptor {
+        static _s_init = (function () {
+            const openOrg = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function () {
+                this.addEventListener("load", XHRInterceptor._handleEvent);
+                openOrg.apply(this, arguments);
+            };
+        })();
+
+        static _s_eventHandlers = {};
+
+        static addEventListener(event, handler) {
+            let handlers = XHRInterceptor._s_eventHandlers[event];
+            if (!handlers) {
+                handlers = XHRInterceptor._s_eventHandlers[event] = [];
+            }
+            handlers.push(handler);
+        }
+
+        static removeEventHandler(event, handler) {
+            const handlers = XHRInterceptor._s_eventHandlers[event];
+            if (handlers) {
+                const index = handlers.indexOf(handler);
+                if (index != -1) {
+                    handlers.splice(index, 1);
+                }
+            }
+        }
+
+        static _handleEvent(event) {
+            const handlers = XHRInterceptor._s_eventHandlers[event.type];
+            if (handlers) {
+                for (let e of handlers) {
+                    e.call(this, event);
+                }
+            }
+        }
+    }
+
+    class RequestWaiter {
+        constructor(urlRegex) {
+            this._urlRegex = urlRegex
+            this._onResponseHandler = this._onResponse.bind(this);
+            this._wait = true;
+            XHRInterceptor.addEventListener("load", this._onResponseHandler);
+        }
+
+        async wait() {
+            while (this._wait) {
+                await delay(100);
+            }
+            return this._event;
+        }
+
+        dispose() {
+            this._wait = false;
+            XHRInterceptor.removeEventHandler("load", this._onResponseHandler);
+        }
+
+        _onResponse(e) {
+            if (!this._urlRegex || e.target.responseURL.match(this._urlRegex)) {
+                this._event = e;
+                this.dispose();
+            }
+        }
+    }
+
+    // wait until the next request is finished
+    async function waitUntilRequestDone(initiator) {
+        const waiter = new RequestWaiter();
+        try {
+            initiator();
+            return await waiter.wait();
+        } finally {
+            waiter.dispose();
+        }
+    }
+
+    async function waitUntilSpinningHasFinished(parent, elementSelector) {
+        const spinner = parent.querySelector(elementSelector);
+        while (spinner.getAttribute("class").includes("ant-spin-blur")) {
+            await delay(200);
+        }
     }
 
     async function waitUntilElementIsFound(elementSelector, root = document, retryCount = 20, initialDelay = 500, maxDelay = 2000) {
@@ -66,7 +151,12 @@
     // wait until the submenu is loaded and return all the menu items
     async function waitUntilSubMenuHasLoaded(i) {
         let subMenu = await waitUntilElementIsFound(`.ant-cascader-menus-content > ul:nth-child(${i + 1})`);
-        return Array.from(subMenu.querySelectorAll('li'));
+        let menuItems = subMenu.querySelectorAll('li');
+        while (menuItems.length === 0) {
+            await delay(100);
+            menuItems = subMenu.querySelectorAll('li');
+        }
+        return Array.from(menuItems);
     }
 
     async function findMenuItem(subMenuIndex, condition) {
@@ -127,7 +217,7 @@
     }
 
     function isCollectiveAddress(addr) {
-        return COLLECTIVE_ADDRESSES.some(e => addr.startsWith(e));
+        return Object.keys(COLLECTIVE_ADDRESSES).some(e => addr.startsWith(e));
     }
 
     function parseAddress(addr) {
@@ -180,9 +270,29 @@
         }
 
         if (isCollectiveResidentAddr || isCollectivePermanentAddr) {
-            alert(`${realName} has a collective address ${residentAddrStr} or ${permanentAddrStr}`);
-            g_stop = true;
-            return;
+            row.querySelector('input[type=checkbox]').click();
+            await delay(100);
+            currentVisibleTab().querySelector('.table-page-search-wrapper button:last-child').click();
+            await delay(500);
+
+            const dialog = currentDialogElement();
+            const collectiveAddr = isCollectiveResidentAddr ? residentAddrStr : permanentAddrStr;
+            const longAddr = Object.keys(COLLECTIVE_ADDRESSES).find(k => collectiveAddr.startsWith(k));
+            const path = COLLECTIVE_ADDRESSES[longAddr].split('/');
+            path.push(longAddr)
+
+            dialog.querySelector('.ant-cascader-picker').click();
+            for (let i = 0; i < path.length; ++i) {
+                const item = await findMenuItem(i, e => e === path[i]);
+                item.click();
+                await delay(200);
+            }
+            await waitUntilRequestDone(() => {
+                dialog.querySelector('.btn-box button:last-child').click();
+            });
+
+            console.log(`*** finish importing ${realName} at ${collectiveAddr}`);
+            return true;
         }
 
         importButton.click();
@@ -203,15 +313,15 @@
         }
 
         // save the info
-        //if (confirm('continue?'))
-        document.querySelector('.peopleInfo .row-btn.ant-row button:last-child').click();
+        await waitUntilRequestDone(() =>  {
+            document.querySelector('.peopleInfo .row-btn.ant-row button:last-child').click();
+        });
 
+        await delay(100);
         // wait until loading has completed
-        const spinner = currentVisibleTab().querySelector('.ant-spin-container');
-        while (spinner.getAttribute('class').includes('ant-spin-blur')) {
-            await delay(200);
-        }
-        console.log(`*** finish importing ${realName}`);
+        await waitUntilSpinningHasFinished(currentVisibleTab(), '.ant-spin-container');
+
+        console.log(`*** finish importing ${realName} at ${residentAddrStr}`);
     }
 
     async function importNextUser() {
