@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Import New Users for Community Cloud
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.2
 // @description  try to take over the world!
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
@@ -285,37 +285,34 @@
             for (let i = 0; i < path.length; ++i) {
                 const item = await findMenuItem(i, e => e === path[i]);
                 item.click();
-                await delay(200);
+                await delay(100);
             }
             await waitUntilRequestDone(() => {
                 dialog.querySelector('.btn-box button:last-child').click();
             });
-
-            console.log(`*** finish importing ${realName} at ${collectiveAddr}`);
-            return true;
-        }
-
-        importButton.click();
-        await waitUntilPersonInfoHasLoaded()
-        console.assert(isLocalResidentAddr || isLocalPermanentAddr, 'at least one address must be local');
-
-        if (residentAddrStr === permanentAddrStr) {
-            console.assert(isLocalResidentAddr && isLocalPermanentAddr);
-            await addApartment(residentAddr, true, true, true);
         } else {
-            if (isLocalResidentAddr) {
-                await addApartment(residentAddr, true, false, isShanghainese);
+            importButton.click();
+            await waitUntilPersonInfoHasLoaded()
+            console.assert(isLocalResidentAddr || isLocalPermanentAddr, 'at least one address must be local');
+
+            if (residentAddrStr === permanentAddrStr) {
+                console.assert(isLocalResidentAddr && isLocalPermanentAddr);
+                await addApartment(residentAddr, true, true, true);
+            } else {
+                if (isLocalResidentAddr) {
+                    await addApartment(residentAddr, true, false, isShanghainese);
+                }
+
+                if (isLocalPermanentAddr) {
+                    await addApartment(permanentAddr, false, true, isShanghainese);
+                }
             }
 
-            if (isLocalPermanentAddr) {
-                await addApartment(permanentAddr, false, true, isShanghainese);
-            }
+            // save the info
+            await waitUntilRequestDone(() =>  {
+                document.querySelector('.peopleInfo .row-btn.ant-row button:last-child').click();
+            });
         }
-
-        // save the info
-        await waitUntilRequestDone(() =>  {
-            document.querySelector('.peopleInfo .row-btn.ant-row button:last-child').click();
-        });
 
         await delay(100);
         // wait until loading has completed
