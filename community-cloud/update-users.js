@@ -165,7 +165,7 @@
         await waitUntilPersonInfoHasLoaded();
 
         const political = document.querySelector('#political');
-        if (userInfo.politicalStatus !== undefined && political.innerText.trim() !== userInfo.politicalStatus) {
+        if (userInfo.politicalStatus && political.innerText.trim() !== userInfo.politicalStatus) {
             political.nextSibling.click();
             await delay(500);
             // show the drop down menu
@@ -179,7 +179,7 @@
         }
 
         const phoneNum = document.querySelector('#phoneNum');
-        if (userInfo.phone !== undefined && userInfo.phone !== phoneNum.value) {
+        if (userInfo.phone && userInfo.phone !== phoneNum.value) {
             phoneNum.nextSibling.click();
             await delay(500);
             const dialog = currentDialogElement();
@@ -190,7 +190,7 @@
         }
 
         const comments = document.querySelector('#memo');
-        if (userInfo.comment !== undefined && userInfo.comment !== comments.value.trim()) {
+        if (userInfo.comment && userInfo.comment !== comments.value.trim()) {
             comments.nextSibling.click();
             await delay(500);
             const dialog = currentDialogElement();
