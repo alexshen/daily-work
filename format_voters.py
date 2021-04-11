@@ -29,5 +29,5 @@ the voter name''')
                 if i == args.columns:
                     f.write('\n')
                     i = 0
-            if i < args.columns:
+            if i and i < args.columns:
                 f.write('\n')
