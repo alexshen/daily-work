@@ -4,7 +4,8 @@ import argparse
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', dest='columns', type=int, default=6, help='number of columns for the output table')
+    parser.add_argument('-c', dest='columns', type=int, default=6,
+                        help='number of columns for the output table')
     parser.add_argument('input', help='''input file path. The input is a
 two-column table, the first column is the group number, the second column is
 the voter name''')
@@ -18,16 +19,15 @@ the voter name''')
             groups.setdefault(int(g), []).append(name)
 
     with open(args.output, 'w', encoding='utf-8') as f:
-        for k in sorted(groups.keys()):
+        for i, k in enumerate(sorted(groups.keys())):
+            if i:
+                f.write('\n')
             f.write('第{}居民小组：\n'.format(k))
             i = 0
-            for name in groups[k]:
-                if i > 0:
-                    f.write('\t')
-                f.write(name)
-                i += 1
-                if i == args.columns:
+            names = groups[k]
+            while i < len(names):
+                if i:
                     f.write('\n')
-                    i = 0
-            if i and i < args.columns:
-                f.write('\n')
+                last = min(i + args.columns, len(names))
+                f.write('\t'.join(names[i:last]))
+                i = last
