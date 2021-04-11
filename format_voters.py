@@ -4,7 +4,7 @@ import argparse
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', dest='columns', default=6, help='number of columns for the output table')
+    parser.add_argument('-c', dest='columns', type=int, default=6, help='number of columns for the output table')
     parser.add_argument('input', help='''input file path. The input is a
 two-column table, the first column is the group number, the second column is
 the voter name''')
