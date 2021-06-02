@@ -103,19 +103,48 @@
         );
     }
 
+    // order of user fields
+    // UF_NAME
+    // UF_ID
+    // UF_PHONE
+    // UF_PERM_ADDR
+    // UF_POP_TYPE
+    // UF_IS_TENANT
+    // UF_SAME_PERM_ADDR
+    // UF_IS_OWNER
+    // UF_ADDR_LONG
+    // UF_ADDR_UNIT
+    // UF_ADDR_ROOM
+    // UF_FLAGS
+
     function parseUsers(resp) {
         const users = [];
         for (let record of resp.result.records) {
-            // find the first living address 
-            const livingState = JSON.parse(record.personHouses).find(e => e.livingState == 0);
-            if (!livingState) {
-                console.error(`no living address found for ${record.realName}`);
-                continue;
+            for (let house of JSON.parse(record.personHouses)) {
+                const match = /(\d+)弄\/(\d+)号楼\/(\d+)/g.exec(house.houseAddress);
+                const fields = [
+                    record.realName, record.cardIdOrg, 
+                    record.phoneOrg,
+                    record.permanentAddress, record.populationType,
+                    // all the living states
+                    // 1 - false,
+                    // 0 - true
+                    // so convert to the real state
+                    1 - parseInt(house.livingState, 10),
+                    1 - parseInt(house.isOneself, 10),
+                    1 - parseInt(house.isOwner, 10)
+                ];
+                fields.push(match[1], match[2], match[3]);
+                // add community flags
+                const flags = []
+                if (record.personOrgsPositions) {
+                    for (let flag of JSON.parse(record.personOrgsPositions)) {
+                        flags.push(flag.tagName);
+                    }
+                }
+                fields.push(flags.join(','))
+                users.push(fields.join('\t'));
             }
-            const match = /(\d+)弄\/(\d+)号楼\/(\d+)/g.exec(livingState.houseAddress);
-            const fields = [record.realName, record.cardIdOrg, record.permanentAddress, record.populationType];
-            fields.push(match[1], match[2], match[3]);
-            users.push(fields.join('\t'));
         }
         return users;
     }
