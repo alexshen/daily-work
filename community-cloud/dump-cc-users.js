@@ -124,7 +124,7 @@
                 const match = /(\d+)弄\/(\d+)号楼\/(\d+)/g.exec(house.houseAddress);
                 const fields = [
                     record.realName, record.cardIdOrg, 
-                    record.phoneOrg,
+                    record.phoneNumOrg,
                     record.permanentAddress, record.populationType,
                     // all the living states
                     // 1 - false,
