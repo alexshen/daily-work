@@ -111,21 +111,49 @@
     // UF_POP_TYPE
     // UF_IS_TENANT
     // UF_SAME_PERM_ADDR
+    // UF_SAME_RESIDENT_ADDR
     // UF_IS_OWNER
     // UF_ADDR_LONG
     // UF_ADDR_UNIT
     // UF_ADDR_ROOM
     // UF_FLAGS
 
-    function parseUsers(resp) {
+    async function getMainResidentAddress(userId) {
+        const url = new URL('/community-cloud/archives/personArchives/queryByIdThrong', document.location.origin);
+        url.searchParams.set('_t', Date.now());
+        url.searchParams.set('id', userId);
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url)
+        xhr.responseType = 'json';
+        xhr.setRequestHeader('X-Access-Token', window.localStorage.getItem('__X-Access-Token'));
+        xhr.send();
+        let done = false;
+        let response;
+        xhr.onload = (event) => {
+            response = event.target.response;
+            done = true;
+        };
+        xhr.onerror = () => done = true;
+        while (!done) {
+            await delay(100);
+        }
+        if (!response) {
+            throw new Error('request error');
+        }
+        return response.result.residenceAddress;
+    }
+
+    async function parseUsers(resp) {
         const users = [];
         for (let record of resp.result.records) {
+            const residentAddr = await getMainResidentAddress(record.id);
             for (let house of JSON.parse(record.personHouses)) {
                 const match = /(\d+)弄\/(\d+)号楼\/(\d+)/g.exec(house.houseAddress);
                 const fields = [
                     record.realName, record.cardIdOrg, 
                     record.phoneNumOrg,
-                    record.permanentAddress, record.populationType,
+                    record.permanentAddress, residentAddr,
+                    record.populationType,
                     // all the living states
                     // 1 - false,
                     // 0 - true
@@ -162,7 +190,7 @@
             if (resp.target.status !== 200) {
                 throw new Error('request error');
             }
-            records.push(...parseUsers(JSON.parse(resp.target.response)));
+            records.push(...await parseUsers(JSON.parse(resp.target.response)));
             if (nextPageButton.getAttribute("class").includes("ant-pagination-disabled")) {
                 break;
             }
