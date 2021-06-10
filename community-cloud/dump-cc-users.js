@@ -143,10 +143,10 @@
         return response.result.residenceAddress;
     }
 
-    async function parseUsers(resp) {
+    async function parseUsers(resp, withResidentAddr) {
         const users = [];
         for (let record of resp.result.records) {
-            const residentAddr = await getMainResidentAddress(record.id);
+            const residentAddr = withResidentAddr ? await getMainResidentAddress(record.id) : '';
             for (let house of JSON.parse(record.personHouses)) {
                 const match = /(\d+)弄\/(\d+)号楼\/(\d+)/g.exec(house.houseAddress);
                 const fields = [
@@ -177,7 +177,7 @@
         return users;
     }
 
-    async function dumpUsers() {
+    async function dumpUsers(withResidentAddr) {
         const currentTab = currentVisibleTab();
         const nextPageButton = currentTab.querySelector("li.ant-pagination-next");
         const records = [];
@@ -190,7 +190,7 @@
             if (resp.target.status !== 200) {
                 throw new Error('request error');
             }
-            records.push(...await parseUsers(JSON.parse(resp.target.response)));
+            records.push(...await parseUsers(JSON.parse(resp.target.response), withResidentAddr));
             if (nextPageButton.getAttribute("class").includes("ant-pagination-disabled")) {
                 break;
             }
@@ -205,7 +205,7 @@
         if (e.altKey && e.key === "k") {
             if (!g_running && confirm("begin dumping?")) {
                 g_running = true;
-                dumpUsers();
+                dumpUsers(e.shiftKey);
             } else if (g_running) {
                 g_running = false;
             }
