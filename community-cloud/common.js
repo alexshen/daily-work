@@ -103,14 +103,16 @@ window.cc = (function() {
 
     /**
      * wait until the started request has finished
-     * NOTE: This only works when there's no pending request before calling the function.
      * @param  initiator a function which starts a request
+     *         The initiator can return nothing or an object which is then awaited on
      * @returns the awaited event
      */
     async function waitUntilRequestDone(initiator) {
-        const waiter = new RequestWaiter();
+        let waiter = initiator();
         try {
-            initiator();
+            if (waiter === undefined || waiter === null) {
+                waiter = new RequestWaiter();
+            }
             return await waiter;
         } finally {
             waiter.dispose();
