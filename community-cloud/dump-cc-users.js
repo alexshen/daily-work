@@ -1,102 +1,22 @@
 // ==UserScript==
 // @name         Dump CC Users
 // @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  try to take over the world!
+// @version      0.2
+// @description  Dump currently listed cc users
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
+// @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        none
 // ==/UserScript==
+
+/* global cc */
 
 (function () {
     "use strict";
 
     let g_running = false;
 
-    function delay(duration) {
-        return new Promise((resolved) => {
-            setTimeout(resolved, duration);
-        });
-    }
-
-    class XHRInterceptor {
-        static _s_init = (function () {
-            const openOrg = XMLHttpRequest.prototype.open;
-            XMLHttpRequest.prototype.open = function () {
-                this.addEventListener("load", XHRInterceptor._handleEvent);
-                openOrg.apply(this, arguments);
-            };
-        })();
-
-        static _s_eventHandlers = {};
-
-        static addEventListener(event, handler) {
-            let handlers = XHRInterceptor._s_eventHandlers[event];
-            if (!handlers) {
-                handlers = XHRInterceptor._s_eventHandlers[event] = [];
-            }
-            handlers.push(handler);
-        }
-
-        static removeEventHandler(event, handler) {
-            const handlers = XHRInterceptor._s_eventHandlers[event];
-            if (handlers) {
-                const index = handlers.indexOf(handler);
-                if (index != -1) {
-                    handlers.splice(index, 1);
-                }
-            }
-        }
-
-        static _handleEvent(event) {
-            const handlers = XHRInterceptor._s_eventHandlers[event.type];
-            if (handlers) {
-                for (let e of handlers) {
-                    e.call(this, event);
-                }
-            }
-        }
-    }
-
-    class RequestWaiter {
-        constructor(urlRegex) {
-            this._urlRegex = urlRegex;
-            this._onResponseHandler = this._onResponse.bind(this);
-            this._wait = true;
-            XHRInterceptor.addEventListener("load", this._onResponseHandler);
-        }
-
-        async wait() {
-            while (this._wait) {
-                await delay(100);
-            }
-            return this._event;
-        }
-
-        dispose() {
-            this._wait = false;
-            XHRInterceptor.removeEventHandler("load", this._onResponseHandler);
-        }
-
-        _onResponse(e) {
-            if (!this._urlRegex || e.target.responseURL.match(this._urlRegex)) {
-                this._event = e;
-                this.dispose();
-            }
-        }
-    }
-
     // wait until the next request is finished
-    async function waitUntilRequestDone(initiator) {
-        const waiter = new RequestWaiter();
-        try {
-            initiator();
-            return await waiter.wait();
-        } finally {
-            waiter.dispose();
-        }
-    }
-
     function currentVisibleTab() {
         return document.querySelector(
             '.main > div > div > div > div:not(.ant-tabs):not([style*="display: none"])'
@@ -135,7 +55,7 @@
         };
         xhr.onerror = () => done = true;
         while (!done) {
-            await delay(100);
+            await cc.delay(100);
         }
         if (!response) {
             throw new Error('request error');
@@ -182,7 +102,7 @@
         const nextPageButton = currentTab.querySelector("li.ant-pagination-next");
         const records = [];
         // force querying the first page
-        let resp = await waitUntilRequestDone(() => {
+        let resp = await cc.waitUntilRequestDone(() => {
             currentTab.querySelector("div.table-page-search-wrapper button:first-child").click();
         });
 
@@ -194,8 +114,8 @@
             if (nextPageButton.getAttribute("class").includes("ant-pagination-disabled")) {
                 break;
             }
-            resp = await waitUntilRequestDone(() => nextPageButton.click());
-            await delay(150);
+            resp = await cc.waitUntilRequestDone(() => nextPageButton.click());
+            await cc.delay(150);
         }
         console.log(records.join("\n"));
         console.log("stopped dumping");

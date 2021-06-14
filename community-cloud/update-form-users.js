@@ -1,28 +1,25 @@
 // ==UserScript==
 // @name         Update Form Users
 // @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  try to take over the world!
+// @version      0.2
+// @description  Update user records with data from a file
 // @author       ashen
 // @match        http://10.87.105.104/datacollector/modules/FormManager2*
+// @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        none
 // ==/UserScript==
+
+/* global cc */
 
 (function () {
     "use strict";
 
     let g_stop = false;
 
-    function delay(duration) {
-        return new Promise((resolved) => {
-            setTimeout(resolved, duration);
-        });
-    }
-
     async function waitUntilSpinningHasFinished(parent, elementSelector) {
         const spinner = parent.querySelector(elementSelector);
         while (spinner.getAttribute("class").includes("ant-spin-blur")) {
-            await delay(200);
+            await cc.delay(200);
         }
     }
 
@@ -30,84 +27,6 @@
         element.value = value;
         // force update, otherwise vue won't pick up the change
         element.dispatchEvent(new Event("input"));
-    }
-
-    class XHRInterceptor {
-        static _s_init = (function () {
-            const openOrg = XMLHttpRequest.prototype.open;
-            XMLHttpRequest.prototype.open = function () {
-                this.addEventListener("load", XHRInterceptor._handleEvent);
-                openOrg.apply(this, arguments);
-            };
-        })();
-
-        static _s_eventHandlers = {};
-
-        static addEventListener(event, handler) {
-            let handlers = XHRInterceptor._s_eventHandlers[event];
-            if (!handlers) {
-                handlers = XHRInterceptor._s_eventHandlers[event] = [];
-            }
-            handlers.push(handler);
-        }
-
-        static removeEventHandler(event, handler) {
-            const handlers = XHRInterceptor._s_eventHandlers[event];
-            if (handlers) {
-                const index = handlers.indexOf(handler);
-                if (index != -1) {
-                    handlers.splice(index, 1);
-                }
-            }
-        }
-
-        static _handleEvent(event) {
-            const handlers = XHRInterceptor._s_eventHandlers[event.type];
-            if (handlers) {
-                for (let e of handlers) {
-                    e.call(this, event);
-                }
-            }
-        }
-    }
-
-    class RequestWaiter {
-        constructor(urlRegex) {
-            this._urlRegex = urlRegex
-            this._onResponseHandler = this._onResponse.bind(this);
-            this._wait = true;
-            XHRInterceptor.addEventListener("load", this._onResponseHandler);
-        }
-
-        async wait() {
-            while (this._wait) {
-                await delay(100);
-            }
-            return this._event;
-        }
-
-        dispose() {
-            this._wait = false;
-            XHRInterceptor.removeEventHandler("load", this._onResponseHandler);
-        }
-
-        _onResponse(e) {
-            if (!this._urlRegex || e.target.responseURL.match(this._urlRegex)) {
-                this._event = e;
-                this.dispose();
-            }
-        }
-    }
-
-    // wait until the next request is finished
-    async function waitUntilRequestDone(initiator) {
-        const waiter = new RequestWaiter();
-        try {
-            initiator();
-            return await waiter.wait();
-        } finally {
-            waiter.dispose();
-        }
     }
 
     function currentDialogElement() {
@@ -125,7 +44,7 @@
     ) {
         let curDelay = initialDelay;
         for (let i = 0; i < retryCount; ++i) {
-            await delay(curDelay);
+            await cc.delay(curDelay);
             let element = root.querySelector(elementSelector);
             if (element) {
                 return element;
@@ -142,7 +61,7 @@
             `.ant-cascader-menus:not([style*="display: none"]) ul:nth-child(${i + 1})`
         );
         if (!subMenu) {
-            throw new Erorr(`sub menu ${i} not found`);
+            throw new Error(`sub menu ${i} not found`);
         }
         return Array.from(subMenu.querySelectorAll("li"));
     }
@@ -228,7 +147,7 @@
 
         async addUser(user) {
             this._addButton.click();
-            await delay(500);
+            await cc.delay(500);
             await this._fillForm(user);
         }
 
@@ -243,12 +162,12 @@
                     throw new Error(`duplidate user ${user}`);
                 }
                 // start editing
-                const resultEvent = await waitUntilRequestDone(() => {
+                const resultEvent = await cc.waitUntilRequestDone(() => {
                     rows[0].querySelector("td:last-child a:first-child").click();
                 });
 
                 // wait until the dialog is open
-                await delay(500);
+                await cc.delay(500);
 
                 if (resultEvent.target.status === 200) {
                     await this._fillForm(user);
@@ -274,14 +193,14 @@
                             // show the cascader menu or drop down menu
                             if (config.field.length === 1) {
                                 inputParentUI.querySelector("div[role=combobox]").click();
-                                await delay(500);
+                                await cc.delay(500);
                                 this._getDropdownItem(firstItem).click();
                             } else {
                                 inputParentUI.querySelector("input").click();
-                                await delay(500);
+                                await cc.delay(500);
                                 await this._selectCascaderMenuItems(user, config.field);
                             }
-                            await delay(200);
+                            await cc.delay(200);
                         }
                     } else {
                         if (user[config.field]) {
@@ -289,28 +208,28 @@
                             if (config.isDate) {
                                 // show the calender ui
                                 input.click();
-                                await delay(500);
+                                await cc.delay(500);
                                 // input the date
                                 const dateInput = document.querySelector(
                                     ".ant-calendar-panel input"
                                 );
                                 updateTextValue(dateInput, user[config.field]);
-                                await delay(500);
+                                await cc.delay(500);
                                 simulateTyping(dateInput, [{ key: "Enter", keyCode: 13 }]);
                             } else {
                                 updateTextValue(input, user[config.field]);
                             }
-                            await delay(200);
+                            await cc.delay(200);
                         }
                     }
                 }
                 ++moduleIndex;
             }
 
-            await waitUntilRequestDone(() => {
+            await cc.waitUntilRequestDone(() => {
                 dialog.querySelector(".ant-modal-footer button:last-child").click();
             });
-            await delay(500);
+            await cc.delay(500);
         }
 
         async filterUsers(criteria) {
@@ -320,12 +239,12 @@
 
             if (typeof criteria.isComplete === "boolean") {
                 await this._isCompleteDropdown.click();
-                await delay(500);
+                await cc.delay(500);
                 this._getDropdownItem(criteria.isComplete ? "是" : "否").click();
-                await delay(500);
+                await cc.delay(500);
             }
 
-            await waitUntilRequestDone(() => this._searchButton.click());
+            await cc.waitUntilRequestDone(() => this._searchButton.click());
             await this._waitUntilSpinningHasFinished();
         }
 
@@ -335,9 +254,9 @@
 
         async deleteUser(row) {
             row.querySelector('td:last-child a:last-child').click();
-            await delay(500);
+            await cc.delay(500);
             const dialog = currentDialogElement();
-            await waitUntilRequestDone(() => dialog.querySelector("button:last-child").click());
+            await cc.waitUntilRequestDone(() => dialog.querySelector("button:last-child").click());
         }
 
         _getDropdownItem(text) {
@@ -360,7 +279,7 @@
         }
 
         async _waitUntilSpinningHasFinished() {
-            await delay(100);
+            await cc.delay(100);
             await waitUntilSpinningHasFinished(this._tableUI, ".ant-spin-container");
         }
     }
@@ -407,7 +326,7 @@
                     `[${i + 1}/${users.length}] updated ${user.username} with id ${user.idNumber}`
                 );
             }
-            await delay(500);
+            await cc.delay(500);
             if (g_stop) {
                 break;
             }
@@ -435,7 +354,9 @@
             let rows = formUpdator.getUserRows();
             while (rows.length && !g_stop) {
                 const userRow = rows[0];
-                const listRequestWaiter = new RequestWaiter(/https?.+\/list\?.+/);
+                const listRequestWaiter = new cc.RequestWaiter(request => {
+                    return /https?.+\/list\?.+/.test(request.responseURL);
+                });
                 try {
                     await formUpdator.deleteUser(userRow);
 
@@ -448,7 +369,7 @@
                     listRequestWaiter.dispose();
                 }
                 rows = formUpdator.getUserRows();
-                await delay(500);
+                await cc.delay(500);
             }
         } finally {
             console.log("deleting stopped");

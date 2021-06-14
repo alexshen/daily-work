@@ -1,23 +1,20 @@
 // ==UserScript==
 // @name         Import New Users for Community Cloud
 // @namespace    http://tampermonkey.net/
-// @version      0.2
-// @description  try to take over the world!
+// @version      0.3
+// @description  Import new users based on their resident addresses
 // @author       ashen
-// @match        http://10.87.105.104/person/PersonInfoList
+// @match        http://10.87.105.104/person/PersonInfoList*
+// @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        none
 // ==/UserScript==
+
+/* global cc */
 
 (function () {
     'use strict';
 
     let g_stop = false;
-
-    function delay(duration) {
-        return new Promise(resolved => {
-            setTimeout(resolved, duration);
-        });
-    }
 
     const VALID_LONGS = {
         '南大路': new Set(['6', '8', '10', '12', '14', '16', '18', '20']),
@@ -50,95 +47,17 @@
         return longs && longs.has(addr[1], 10);
     }
 
-    class XHRInterceptor {
-        static _s_init = (function () {
-            const openOrg = XMLHttpRequest.prototype.open;
-            XMLHttpRequest.prototype.open = function () {
-                this.addEventListener("load", XHRInterceptor._handleEvent);
-                openOrg.apply(this, arguments);
-            };
-        })();
-
-        static _s_eventHandlers = {};
-
-        static addEventListener(event, handler) {
-            let handlers = XHRInterceptor._s_eventHandlers[event];
-            if (!handlers) {
-                handlers = XHRInterceptor._s_eventHandlers[event] = [];
-            }
-            handlers.push(handler);
-        }
-
-        static removeEventHandler(event, handler) {
-            const handlers = XHRInterceptor._s_eventHandlers[event];
-            if (handlers) {
-                const index = handlers.indexOf(handler);
-                if (index != -1) {
-                    handlers.splice(index, 1);
-                }
-            }
-        }
-
-        static _handleEvent(event) {
-            const handlers = XHRInterceptor._s_eventHandlers[event.type];
-            if (handlers) {
-                for (let e of handlers) {
-                    e.call(this, event);
-                }
-            }
-        }
-    }
-
-    class RequestWaiter {
-        constructor(urlRegex) {
-            this._urlRegex = urlRegex
-            this._onResponseHandler = this._onResponse.bind(this);
-            this._wait = true;
-            XHRInterceptor.addEventListener("load", this._onResponseHandler);
-        }
-
-        async wait() {
-            while (this._wait) {
-                await delay(100);
-            }
-            return this._event;
-        }
-
-        dispose() {
-            this._wait = false;
-            XHRInterceptor.removeEventHandler("load", this._onResponseHandler);
-        }
-
-        _onResponse(e) {
-            if (!this._urlRegex || e.target.responseURL.match(this._urlRegex)) {
-                this._event = e;
-                this.dispose();
-            }
-        }
-    }
-
-    // wait until the next request is finished
-    async function waitUntilRequestDone(initiator) {
-        const waiter = new RequestWaiter();
-        try {
-            initiator();
-            return await waiter.wait();
-        } finally {
-            waiter.dispose();
-        }
-    }
-
     async function waitUntilSpinningHasFinished(parent, elementSelector) {
         const spinner = parent.querySelector(elementSelector);
         while (spinner.getAttribute("class").includes("ant-spin-blur")) {
-            await delay(200);
+            await cc.delay(200);
         }
     }
 
     async function waitUntilElementIsFound(elementSelector, root = document, retryCount = 20, initialDelay = 500, maxDelay = 2000) {
         let curDelay = initialDelay;
         for (let i = 0; i < retryCount; ++i) {
-            await delay(curDelay);
+            await cc.delay(curDelay);
             let element = root.querySelector(elementSelector);
             if (element) {
                 return element;
@@ -158,7 +77,7 @@
         let subMenu = await waitUntilElementIsFound(`.ant-cascader-menus-content > ul:nth-child(${i + 1})`);
         let menuItems = subMenu.querySelectorAll('li');
         while (menuItems.length === 0) {
-            await delay(100);
+            await cc.delay(100);
             menuItems = subMenu.querySelectorAll('li');
         }
         return Array.from(menuItems);
@@ -179,7 +98,7 @@
 
         peopleAddButton.click();
         // wait until the dialog shows up
-        await delay(1000);
+        await cc.delay(1000);
 
         const dialog = currentDialogElement();
         // show the committe sub menu
@@ -207,18 +126,18 @@
         let roomButton = await findMenuItem(5, title => title === addr[3]);
         // select the room
         roomButton.click();
-        await delay(500);
+        await cc.delay(500);
 
         const apartmentStates = [isResidentAddr, isPermanentAddr, isOwner];
         const optionRows = dialog.querySelectorAll('.ant-modal-body form > div');
         for (let i = 0; i < optionRows.length; ++i) {
             const option = optionRows[i].querySelectorAll('div:last-child label.ant-radio-wrapper')[apartmentStates[i] ? 0 : 1];
             option.click();
-            await delay(500);
+            await cc.delay(500);
         }
 
         dialog.querySelector('.ant-modal-footer button:last-child').click();
-        await delay(1000);
+        await cc.delay(1000);
     }
 
     function isCollectiveAddress(addr) {
@@ -262,12 +181,12 @@
 
             // report that the user has moved away
             reportButton.click();
-            await delay(1000);
+            await cc.delay(1000);
 
             const dialog = currentDialogElement();
             // click the moved away button
             dialog.querySelector('.ant-modal-body label').click();
-            await delay(500);
+            await cc.delay(500);
             // click ok
             dialog.querySelector('.ant-modal-footer button:last-child').click();
             //document.querySelector('.ant-modal-footer button').click();
@@ -276,9 +195,9 @@
 
         if (isCollectiveResidentAddr || isCollectivePermanentAddr) {
             row.querySelector('input[type=checkbox]').click();
-            await delay(100);
+            await cc.delay(100);
             currentVisibleTab().querySelector('.table-page-search-wrapper button:last-child').click();
-            await delay(500);
+            await cc.delay(500);
 
             const dialog = currentDialogElement();
             const collectiveAddr = isCollectiveResidentAddr ? residentAddrStr : permanentAddrStr;
@@ -290,9 +209,9 @@
             for (let i = 0; i < path.length; ++i) {
                 const item = await findMenuItem(i, e => e === path[i]);
                 item.click();
-                await delay(100);
+                await cc.delay(100);
             }
-            await waitUntilRequestDone(() => {
+            await cc.waitUntilRequestDone(() => {
                 dialog.querySelector('.btn-box button:last-child').click();
             });
         } else {
@@ -314,12 +233,12 @@
             }
 
             // save the info
-            await waitUntilRequestDone(() =>  {
+            await cc.waitUntilRequestDone(() =>  {
                 document.querySelector('.peopleInfo .row-btn.ant-row button:last-child').click();
             });
         }
 
-        await delay(100);
+        await cc.delay(100);
         // wait until loading has completed
         await waitUntilSpinningHasFinished(currentVisibleTab(), '.ant-spin-container');
 
@@ -331,7 +250,7 @@
         if (firstUserRow) {
             try {
                 await processUser(firstUserRow);
-                await delay(1000);
+                await cc.delay(1000);
                 if (!g_stop) {
                     importNextUser();
                 } else {

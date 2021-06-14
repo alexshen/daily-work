@@ -1,67 +1,25 @@
 // ==UserScript==
 // @name         Update User Info
 // @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  try to take over the world!
+// @version      0.2
+// @description  Update user info with the data from a file
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
+// @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        none
 // ==/UserScript==
+
+/* global cc */
 
 (function () {
     'use strict';
 
     let g_stop = false;
 
-    class XHRInterceptor {
-        static _s_init = (function() {
-            const openOrg = XMLHttpRequest.prototype.open;
-            XMLHttpRequest.prototype.open = function() {
-                this.addEventListener('load', XHRInterceptor._handleEvent);
-                openOrg.apply(this, arguments);
-            };
-        })();
-
-        static _s_eventHandlers = {};
-
-        static addEventListener(event, handler) {
-            let handlers = XHRInterceptor._s_eventHandlers[event];
-            if (!handlers) {
-                handlers = XHRInterceptor._s_eventHandlers[event] = []
-            }
-            handlers.push(handler);
-        }
-
-        static removeEventHandler(event, handler) {
-            const handlers = XHRInterceptor._s_eventHandlers[event];
-            if (handlers) {
-                const index = handlers.indexOf(handler);
-                if (index != -1) {
-                    handlers.splice(index, 1);
-                }
-            }
-        }
-
-        static _handleEvent(event) {
-            const handlers = XHRInterceptor._s_eventHandlers[event.type];
-            if (handlers) {
-                for (let e of handlers) {
-                    e.call(this, event);
-                }
-            }
-        }
-    };
-
-    function delay(duration) {
-        return new Promise(resolved => {
-            setTimeout(resolved, duration);
-        });
-    }
-
     async function waitUntilElementIsFound(elementSelector, root = document, retryCount = 20, initialDelay = 500, maxDelay = 2000) {
         let curDelay = initialDelay;
         for (let i = 0; i < retryCount; ++i) {
-            await delay(curDelay);
+            await cc.delay(curDelay);
             let element = root.querySelector(elementSelector);
             if (element) {
                 return element;
@@ -83,7 +41,7 @@
     async function waitUntilSpinningHasFinished(parent, elementSelector) {
         const spinner = parent.querySelector(elementSelector);
         while (spinner.getAttribute('class').includes('ant-spin-blur')) {
-            await delay(200);
+            await cc.delay(200);
         }
     }
 
@@ -94,16 +52,6 @@
             }
         }
         return null;
-    }
-
-    class User {
-        constructor(username, idNumber, politicalStatus, phone, comment) {
-            this.username = username;
-            this.idNumber = idNumber;
-            this.politicalStatus = politicalStatus;
-            this.phone = phone;
-            this.comment = comment;
-        }
     }
 
     function updateTextValue(element, value) {
@@ -133,14 +81,14 @@
             }
         };
 
-        XHRInterceptor.addEventListener('load', handler);
+        cc.XHRInterceptor.addEventListener('load', handler);
         try {
             pageUI.querySelector('.btn-group-wrapper button:nth-child(2)').click();
             // wait until the searching has completed
-            await delay(100);
+            await cc.delay(100);
             await waitUntilSpinningHasFinished(pageUI, '.ant-spin-container');
         } finally {
-            XHRInterceptor.removeEventHandler('load', handler);
+            cc.XHRInterceptor.removeEventHandler('load', handler);
         }
 
         if (!searchResults) {
@@ -167,38 +115,38 @@
         const political = document.querySelector('#political');
         if (userInfo.politicalStatus && political.innerText.trim() !== userInfo.politicalStatus) {
             political.nextSibling.click();
-            await delay(500);
+            await cc.delay(500);
             // show the drop down menu
             const dialog = currentDialogElement();
             dialog.querySelector('.ant-modal-root #political').click();
-            await delay(500);
+            await cc.delay(500);
             getDropDownMenuItem(userInfo.politicalStatus).click();
             // confirm and close
             dialog.querySelector('button:nth-child(2)').click();
-            await delay(500);
+            await cc.delay(500);
         }
 
         const phoneNum = document.querySelector('#phoneNum');
         if (userInfo.phone && userInfo.phone !== phoneNum.value) {
             phoneNum.nextSibling.click();
-            await delay(500);
+            await cc.delay(500);
             const dialog = currentDialogElement();
             updateTextValue(dialog.querySelector('#phoneNum'), userInfo.phone);
             // confirm and close
             dialog.querySelector('button:nth-child(2)').click();
-            await delay(500);
+            await cc.delay(500);
         }
 
         const comments = document.querySelector('#memo');
         if (userInfo.comment && userInfo.comment !== comments.value.trim()) {
             comments.nextSibling.click();
-            await delay(500);
+            await cc.delay(500);
             const dialog = currentDialogElement();
             // empty string is not allowed, so add a white space
             updateTextValue(dialog.querySelector('textarea'), userInfo.comment || " ");
             // confirm and close
             dialog.querySelector('button:nth-child(2)').click();
-            await delay(500);
+            await cc.delay(500);
         }
 
         document.querySelector('.peopleInfo .row-btn.ant-row .ant-btn').click();
@@ -250,7 +198,7 @@
             if (await updateUser(user)) {
                 console.log(`[${i + 1}/${users.length}] updated ${user.username} with id ${user.idNumber}`);
             }
-            await delay(500);
+            await cc.delay(500);
             if (g_stop) {
                 break;
             }

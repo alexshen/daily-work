@@ -1,3 +1,5 @@
+/* exported dumpGroupingStates */
+
 function dumpGroupingStates() {
     const groups = document.querySelectorAll(".room .flex-item");
     const roomStates = [];
