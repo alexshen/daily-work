@@ -60,7 +60,7 @@ window.cc = (function() {
         constructor(predicate) {
             this._predicate = predicate;
             this._onResponseHandler = this._onResponse.bind(this);
-            this._wait = true;
+            this._isWaiting = true;
             XHRInterceptor.addEventListener("load", this._onResponseHandler);
             XHRInterceptor.addEventListener("error", this._onResponseHandler);
         }
@@ -71,10 +71,10 @@ window.cc = (function() {
 
         /**
          * wait until the target response has been received
-         * @returns the response event
+         * @returns the request
          */
         async _wait(resolve, reject) {
-            while (this._wait) {
+            while (this._isWaiting) {
                 await delay(100);
             }
             if (this._request) {
@@ -88,7 +88,7 @@ window.cc = (function() {
          * force ending the waiting
          */
         dispose() {
-            this._wait = false;
+            this._isWaiting = false;
             XHRInterceptor.removeEventHandler("load", this._onResponseHandler);
             XHRInterceptor.removeEventHandler("error", this._onResponseHandler);
         }
