@@ -4,7 +4,7 @@ window.cc = (function() {
 
     /** 
      * return a promise which delays for a period of time
-     * @param durationMs milliseconds to delay
+     * @param {number} durationMs milliseconds to delay
      * @returns a promise
      * */ 
     function delay(durationMs) {
@@ -54,7 +54,7 @@ window.cc = (function() {
 
     class RequestWaiter {
         /**
-         * @param {*} predicate returns true indicating the waiting should end
+         * @param predicate returns true indicating the waiting should end
          */
         constructor(predicate) {
             this._filter = predicate;
@@ -90,9 +90,26 @@ window.cc = (function() {
         }
     }
 
+    /**
+     * wait until the started request has finished
+     * NOTE: This only works when there's no pending request before calling the function.
+     * @param  initiator a function which starts a request
+     * @returns the awaited event
+     */
+    async function waitUntilRequestDone(initiator) {
+        const waiter = new RequestWaiter();
+        try {
+            initiator();
+            return waiter.wait();
+        } finally {
+            waiter.dispose();
+        }
+    }
+
     return {
         delay: delay,
         XHRInterceptor: XHRInterceptor,
         RequestWaiter: RequestWaiter,
+        waitUntilRequestDone: waitUntilRequestDone,
     };
 })();
