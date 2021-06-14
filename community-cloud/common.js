@@ -18,6 +18,7 @@ window.cc = (function() {
             const openOrg = XMLHttpRequest.prototype.open;
             XMLHttpRequest.prototype.open = function () {
                 this.addEventListener("load", XHRInterceptor._handleEvent);
+                this.addEventListener("error", XHRInterceptor._handleEvent);
                 openOrg.apply(this, arguments);
             };
         })();
@@ -57,21 +58,30 @@ window.cc = (function() {
          * @param predicate returns true indicating the waiting should end
          */
         constructor(predicate) {
-            this._filter = predicate;
+            this._predicate = predicate;
             this._onResponseHandler = this._onResponse.bind(this);
             this._wait = true;
             XHRInterceptor.addEventListener("load", this._onResponseHandler);
+            XHRInterceptor.addEventListener("error", this._onResponseHandler);
+        }
+
+        then(resolve, reject) {
+            this._wait(resolve, reject);
         }
 
         /**
          * wait until the target response has been received
          * @returns the response event
          */
-        async wait() {
+        async _wait(resolve, reject) {
             while (this._wait) {
                 await delay(100);
             }
-            return this._event;
+            if (this._request) {
+                resolve(this._request);
+            } else {
+                reject(new Error('request waiting was aborted'));
+            }
         }
 
         /**
@@ -80,11 +90,12 @@ window.cc = (function() {
         dispose() {
             this._wait = false;
             XHRInterceptor.removeEventHandler("load", this._onResponseHandler);
+            XHRInterceptor.removeEventHandler("error", this._onResponseHandler);
         }
 
         _onResponse(e) {
-            if (!this._filter || this._filter(e.target)) {
-                this._event = e;
+            if (!this._predicate || this._predicate(e.target)) {
+                this._request = e.target;
                 this.dispose();
             }
         }
@@ -100,7 +111,7 @@ window.cc = (function() {
         const waiter = new RequestWaiter();
         try {
             initiator();
-            return waiter.wait();
+            return await waiter;
         } finally {
             waiter.dispose();
         }
