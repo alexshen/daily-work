@@ -1,6 +1,7 @@
 _VACCINED_FIELDS = 'id,,undefined,houseAddres,realName,vaccinatedState,vaccinatedTime,vaccinatedProducts,vaccinatedMemo'
 _UNVACCINED_FIELDS = 'id,,undefined,houseAddres,realName,vaccinatedValue,vaccinatedMemo'
 
+import datetime
 
 class VaccinationService:
     def __init__(self, app):
@@ -27,6 +28,10 @@ class VaccinationService:
         params['type'] = 0
         if 'vaccination_state' in kwargs:
             params['vaccinatedState'] = kwargs['vaccination_state']
+        if 'date_start' in kwargs:
+            params['dateBefore'] = params['date_start'].isoformat()
+        if 'date_end' in kwargs:
+            params['dateAfter'] = params['date_end'].isoformat()
         params['age1'] = kwargs.get('min_age', 18)
         params['age2'] = kwargs.get('max_age', 200)
         params['column'] = 'createTime'
