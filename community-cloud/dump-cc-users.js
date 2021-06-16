@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump CC Users
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Dump currently listed cc users
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
@@ -107,10 +107,10 @@
         });
 
         while (g_running) {
-            if (resp.target.status !== 200) {
+            if (resp.status !== 200) {
                 throw new Error('request error');
             }
-            records.push(...await parseUsers(JSON.parse(resp.target.response), withResidentAddr));
+            records.push(...await parseUsers(JSON.parse(resp.response), withResidentAddr));
             if (nextPageButton.getAttribute("class").includes("ant-pagination-disabled")) {
                 break;
             }
