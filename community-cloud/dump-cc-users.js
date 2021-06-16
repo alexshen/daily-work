@@ -24,8 +24,9 @@
     }
 
     // order of user fields
+    // UF_UUID
     // UF_NAME
-    // UF_ID
+    // UF_ID_NUMBER
     // UF_PHONE
     // UF_PERM_ADDR
     // UF_POP_TYPE
@@ -70,9 +71,12 @@
             for (let house of JSON.parse(record.personHouses)) {
                 const match = /(\d+)弄\/(\d+)号楼\/(\d+)/g.exec(house.houseAddress);
                 const fields = [
-                    record.realName, record.cardIdOrg, 
+                    record.id,
+                    record.realName, 
+                    record.cardIdOrg, 
                     record.phoneNumOrg,
-                    record.permanentAddress, residentAddr,
+                    record.permanentAddress, 
+                    residentAddr,
                     record.populationType,
                     // all the living states
                     // 1 - false,
