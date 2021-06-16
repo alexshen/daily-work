@@ -162,17 +162,17 @@
                     throw new Error(`duplidate user ${user}`);
                 }
                 // start editing
-                const resultEvent = await cc.waitUntilRequestDone(() => {
+                const resp = await cc.waitUntilRequestDone(() => {
                     rows[0].querySelector("td:last-child a:first-child").click();
                 });
 
                 // wait until the dialog is open
                 await cc.delay(500);
 
-                if (resultEvent.target.status === 200) {
+                if (resp.status === 200) {
                     await this._fillForm(user);
                 } else {
-                    throw new Error(resultEvent);
+                    throw new Error(resp);
                 }
             }
         }
