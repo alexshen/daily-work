@@ -11,13 +11,22 @@ def register(parent_parsers):
     parser = parent_parsers.add_parser('vac', help='vaccination services')
     subparsers = parser.add_subparsers(required=True, metavar='sub-commands')
 
-    list_parser = subparsers.add_parser(
+    # list sub-command
+    sp = subparsers.add_parser(
         'list', help='list vaccination records')
-    list_parser.add_argument('-p', type=int, default=1, help='page number')
-    list_parser.add_argument('-n', type=int, default=10,
+    sp.add_argument('-p', type=int, default=1, help='page number')
+    sp.add_argument('-n', type=int, default=10,
                              help='number of records per page')
-    list_parser.set_defaults(func=list_main)
+    sp.set_defaults(func=list_main)
+
+    # update sub-command
+    sp = subparsers.add_parser(
+        'update', help='update vaccination records')
+    sp.set_defaults(func=update_main)
 
 
 def list_main(app: cc.Application, args):
+    pass
+
+def update_main(app: cc.Application, args):
     pass
