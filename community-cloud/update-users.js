@@ -64,6 +64,10 @@
         return document.querySelector('.main > div > div > div > div:not(.ant-tabs):not([style*="display: none"])');
     }
 
+    const UR_USER_NOT_FOUND = 0;
+    const UR_NOT_UPDATED = 1;
+    const UR_UPDATED = 2;
+
     // search the resident with the given name, return the data row if found
     async function updateUser(userInfo) {
         // console.log(userInfo);
@@ -83,7 +87,7 @@
 
         cc.XHRInterceptor.addEventListener('load', handler);
         try {
-            pageUI.querySelector('.btn-group-wrapper button:nth-child(2)').click();
+            pageUI.querySelector('.btn-group-wrapper button:first-child').click();
             // wait until the searching has completed
             await cc.delay(100);
             await waitUntilSpinningHasFinished(pageUI, '.ant-spin-container');
@@ -93,25 +97,26 @@
 
         if (!searchResults) {
             console.log(`${userInfo.username} not found`);
-            return false;
+            return UR_USER_NOT_FOUND;
         }
 
         const rows = pageUI.querySelectorAll('.ant-table-tbody tr');
         if (rows.length !== searchResults.length) {
             console.error('number of visual results differs from that of data results');
-            return false;
+            return UR_USER_NOT_FOUND;
         }
 
         const index = searchResults.findIndex(e => e.cardIdOrg === userInfo.idNumber);
         if (index === -1) {
             console.error(`${userInfo.username} with id number ${userInfo.idNumber} not found`);
-            return false;
+            return UR_USER_NOT_FOUND;
         }
         // show the person info
         rows[index].querySelector('td:nth-child(2) span').click();
         // wait until the person info has loaded
         await waitUntilPersonInfoHasLoaded();
 
+        let changed = false;
         const political = document.querySelector('#political');
         if (userInfo.politicalStatus && political.innerText.trim() !== userInfo.politicalStatus) {
             political.nextSibling.click();
@@ -124,6 +129,8 @@
             // confirm and close
             dialog.querySelector('button:nth-child(2)').click();
             await cc.delay(500);
+
+            changed = true;
         }
 
         const phoneNum = document.querySelector('#phoneNum');
@@ -135,6 +142,8 @@
             // confirm and close
             dialog.querySelector('button:nth-child(2)').click();
             await cc.delay(500);
+
+            changed = true;
         }
 
         const comments = document.querySelector('#memo');
@@ -147,13 +156,15 @@
             // confirm and close
             dialog.querySelector('button:nth-child(2)').click();
             await cc.delay(500);
+
+            changed = true;
         }
 
         document.querySelector('.peopleInfo .row-btn.ant-row .ant-btn').click();
 
         // wait until the searching has completed
         await waitUntilSpinningHasFinished(pageUI, '.ant-spin-container');
-        return true;
+        return changed ? UR_UPDATED : UR_NOT_UPDATED;
     }
 
     async function readFile(blobOrFile, encoding='utf-8') {
@@ -195,9 +206,11 @@
         const users = await readUserRecords(filename);
         for (let i = 0; i < users.length; ++i) {
             const user = users[i];
-            if (await updateUser(user)) {
-                console.log(`[${i + 1}/${users.length}] updated ${user.username} with id ${user.idNumber}`);
+            const updateResult = await updateUser(user);
+            if (updateResult === UR_USER_NOT_FOUND) {
+                continue;
             }
+            console.log(`[${i + 1}/${users.length}] ${user.username} with id ${user.idNumber} ${updateResult === UR_UPDATED ? "updated" : "not updated"}`);
             await cc.delay(500);
             if (g_stop) {
                 break;
