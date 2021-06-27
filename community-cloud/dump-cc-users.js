@@ -30,7 +30,7 @@
     // UF_PHONE
     // UF_PERM_ADDR
     // UF_POP_TYPE
-    // UF_IS_TENANT
+    // UF_IS_RESIDENT
     // UF_SAME_PERM_ADDR
     // UF_SAME_RESIDENT_ADDR
     // UF_IS_OWNER
