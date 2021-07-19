@@ -28,12 +28,12 @@
             //record.residenceAddress,
             record.realName,
             record.phoneNum,
-            record.vaccinatedTime,
+            record.vaccinatedTime || '',
             // 44810510A for KangXiNuo
-            record.vaccinatedProducts,
+            record.vaccinatedProducts || '',
             // 1 - one dose, 2 - two doses
-            record.vaccinatedState,
-            record.vaccinatedMemo,
+            record.vaccinatedState || '',
+            record.vaccinatedMemo || '',
         ];
         return fields.join('\t');
     }
