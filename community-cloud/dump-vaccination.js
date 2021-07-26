@@ -34,6 +34,7 @@
             // 1 - one dose, 2 - two doses
             record.vaccinatedState || '',
             record.vaccinatedMemo || '',
+            record.vaccinatedValue || ''
         ];
         return fields.join('\t');
     }
