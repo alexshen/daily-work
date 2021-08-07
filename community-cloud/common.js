@@ -210,6 +210,112 @@ window.cc = (function() {
         return xhr.response;
     }
 
+    const SHORTCUT = {
+        Control: 1 << 0,
+        Alt: 1 << 1,
+        Shift: 1 << 2,
+    };
+
+    const KEYCODE = {
+        Digit0: "0",
+        Digit1: "1",
+        Digit2: "2",
+        Digit3: "3",
+        Digit4: "4",
+        Digit5: "5",
+        Digit6: "6",
+        Digit7: "7",
+        Digit8: "8",
+        Digit9: "9",
+        KeyA: "a",
+        KeyB: "b",
+        KeyC: "c",
+        KeyD: "d",
+        KeyE: "e",
+        KeyF: "f",
+        KeyG: "g",
+        KeyH: "h",
+        KeyI: "i",
+        KeyJ: "j",
+        KeyK: "k",
+        KeyL: "l",
+        KeyM: "m",
+        KeyN: "n",
+        KeyO: "o",
+        KeyP: "p",
+        KeyQ: "q",
+        KeyR: "r",
+        KeyS: "s",
+        KeyT: "t",
+        KeyU: "u",
+        KeyV: "v",
+        KeyW: "w",
+        KeyX: "x",
+        KeyY: "y",
+        KeyZ: "z",
+    };
+
+    class ShortcutManager {
+
+        constructor() {
+            this._modifiers = 0;
+            this._shortcuts = [];
+            this._pressedKeys = new Set();
+        }
+
+        /**
+         * register a keyboard shortcut for an action
+         * @param  modifiers an integer of modifier states
+         * @param {string} keys a string of keys to test which must not contain duplicates
+         */
+        register(modifiers, keys, action) {
+            if (modifiers === 0) {
+                throw new Error('modifiers must be not 0');
+            }
+            if (keys.length === 0) {
+                throw new Error('keys must not be empty');
+            }
+            this._shortcuts.push({
+                modifiers: modifiers,
+                keys: keys,
+                action: action
+            });
+        }
+
+        onKeyDown(event) {
+            if (event.key in SHORTCUT) {
+                this._modifiers |= SHORTCUT[event.key];
+                return;
+            }
+            if (event.code in KEYCODE) {
+                this._pressedKeys.add(KEYCODE[event.code]);
+            }
+
+            for (let s of this._shortcuts) {
+                if (s.modifiers !== this._modifiers || this._pressedKeys.size !== s.keys.length) {
+                    continue;
+                }
+                let matched = true;
+                for (let k of s.keys) {
+                    if (!this._pressedKeys.has(k)) {
+                        matched = false;
+                    }
+                }
+                if (matched) {
+                    s.action();
+                }
+            }
+        }
+
+        onKeyUp(event) {
+            if (event.key in SHORTCUT) {
+                this._modifiers &= ~SHORTCUT[event.key];
+                return;
+            }
+            this._pressedKeys.delete(KEYCODE[event.key]);
+        }
+    }
+
     return {
         delay: delay,
         XHRInterceptor: XHRInterceptor,
@@ -219,5 +325,7 @@ window.cc = (function() {
         objectFromKeyValueArrays: objectFromKeyValueArrays,
         readRecords: readRecords,
         doRequest: doRequest,
+        SHORTCUT: SHORTCUT,
+        ShortcutManager: ShortcutManager,
     };
 })();
