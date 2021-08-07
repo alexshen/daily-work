@@ -3,16 +3,28 @@
 /* global cc */
 
 window.ccu = (function() {
-    async function get(urlOrString, params, headers, responseType) {
-        headers['X-Access-Token'] = window.localStorage.getItem('__X-Access-Token');
-        return await cc.doRequest(urlOrString, 'GET', params, null, headers, responseType);
+    function extractResponseContent(response) {
+        if (response.success !== undefined && !response.success) {
+            throw new Error(response);
+        }
+        if (response.code != undefined && response.code !== 200) {
+            throw new Error(response);
+        }
+        return response.result;
     }
 
-    async function postJson(urlOrString, json, responseType) {
+    async function get(urlOrString, params, headers) {
+        headers['X-Access-Token'] = window.localStorage.getItem('__X-Access-Token');
+        const resp =  await cc.doRequest(urlOrString, 'GET', params, null, headers, 'json');
+        return extractResponseContent(resp);
+    }
+
+    async function postJson(urlOrString, json) {
         const headers = {};
         headers['X-Access-Token'] = window.localStorage.getItem('__X-Access-Token');
         headers['Content-Type'] = 'application/json';
-        return await cc.doRequest(urlOrString, 'POST', null, json, headers, responseType);
+        const resp = await cc.doRequest(urlOrString, 'POST', null, json, headers, 'json');
+        return extractResponseContent(resp);
     }
 
     return {
