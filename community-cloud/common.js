@@ -119,10 +119,68 @@ window.cc = (function() {
         }
     }
 
+    /**
+     * read the file with the specified encoding
+     * @param blobOrFile Blob or File object
+     * @param {string} encoding encoding of the file, the default is utf-8
+     * @returns a promise returning the file content
+     */
+    async function readFile(blobOrFile, encoding='utf-8') {
+        return new Promise((resolve, reject) => {
+            let reader = new FileReader();
+            reader.readAsText(blobOrFile, encoding);
+            reader.onload = e => {
+                resolve(e.target.result);
+            };
+            reader.onerror = reject;
+        });
+    }
+
+    /**
+     * Populate an object with keys and values.
+     * If there are more keys than values, the corresponding values will be set to null.
+     * If there are less keys than values, the extra values will be discarded.
+     * @param {*} keys an array of keys
+     * @param {*} values an array of values corresponding to the keys
+     * @returns an object with key/value pairs populated
+     */
+    function objectFromKeyValueArrays(keys, values) {
+        const o = {};
+        keys.forEach((e, i) => {
+            o[e] = values[i];
+        });
+        return o;
+    }
+
+    /**
+     * Read records from a file, the first line must contain field names.
+     * If there are less columns than field names, extra columns will be set to null.
+     * If there are more columns than field names, extra columns will be discarded.
+     * @param {string} filename 
+     * @param sep a simple string or regular expression
+     * @returns an array of record objects
+     */
+    async function readRecords(filename, sep='\t') {
+        const data = await readFile(filename);
+        const [fieldLine, ...recordLines] = data.split(/\r\n?|\n/);
+        const fieldNames = fieldLine.split(sep);
+        const records = [];
+        for (let line of recordLines) {
+            if (line.length === 0) {
+                break;
+            }
+            records.push(objectFromKeyValueArrays(fieldNames, line.split(sep)));
+        }
+        return records;
+    }
+
     return {
         delay: delay,
         XHRInterceptor: XHRInterceptor,
         RequestWaiter: RequestWaiter,
         waitUntilRequestDone: waitUntilRequestDone,
+        readFile: readFile,
+        objectFromKeyValueArrays: objectFromKeyValueArrays,
+        readRecords: readRecords,
     };
 })();
