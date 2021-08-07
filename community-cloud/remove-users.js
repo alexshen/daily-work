@@ -77,11 +77,16 @@
             return false;
         }
 
-        const index = searchResults.findIndex(e => e.cardIdOrg === userInfo.idNumber);
-        if (index === -1) {
+        const matches = searchResults.filter(e => new RegExp(userInfo.idNumber).test(e.cardIdOrg));
+        if (matches.length === 0) {
             console.error(`${userInfo.username} with id number ${userInfo.idNumber} not found`);
             return false;
         }
+        if (matches.length > 1) {
+            console.error(`${userInfo.username} with id number ${userInfo.idNumber} has more than 1 matches`);
+            return false;
+        }
+        const index = searchResults.indexOf(matches[0]);
         if (searchResults[index].housePerson.length > 1) {
             console.error(`${userInfo.username} with id number ${userInfo.idNumber} has more than 1 flats, manual operation is needed`);
             return false;
