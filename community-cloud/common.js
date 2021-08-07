@@ -174,6 +174,42 @@ window.cc = (function() {
         return records;
     }
 
+    async function doRequest(urlOrString, method, params, data, headers, responseType) {
+        let url = urlOrString;
+        if (typeof urlOrString === 'string') {
+            url = new URL(urlOrString);
+        }
+        if (params) {
+            for (let key in params) {
+                url.searchParams.set(key, params[key]);
+            }
+        }
+        const xhr = new XMLHttpRequest();
+        xhr.open(method, url)
+        if (responseType) {
+            xhr.responseType = responseType;
+        }
+        if (headers) {
+            for (let key in headers) {
+                xhr.setRequestHeader(key, headers[key]);
+            }
+        }
+        xhr.send(data);
+        let done = false;
+        xhr.onload = () => done = true;
+        xhr.onerror = () => done = true;
+        while (!done) {
+            await cc.delay(100);
+        }
+        if (!xhr.status) {
+            throw new Error('request error');
+        }
+        if (xhr.status !== 200) {
+            throw new Error(xhr);
+        }
+        return xhr.response;
+    }
+
     return {
         delay: delay,
         XHRInterceptor: XHRInterceptor,
@@ -182,5 +218,6 @@ window.cc = (function() {
         readFile: readFile,
         objectFromKeyValueArrays: objectFromKeyValueArrays,
         readRecords: readRecords,
+        doRequest: doRequest,
     };
 })();
