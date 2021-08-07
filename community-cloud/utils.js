@@ -5,10 +5,10 @@
 window.ccu = (function() {
     function extractResponseContent(response) {
         if (response.success !== undefined && !response.success) {
-            throw new Error(response);
+            throw new Error(JSON.stringify(response));
         }
         if (response.code != undefined && response.code !== 200) {
-            throw new Error(response);
+            throw new Error(JSON.stringify(response));
         }
         return response.result;
     }
@@ -23,7 +23,7 @@ window.ccu = (function() {
         const headers = {};
         headers['X-Access-Token'] = window.localStorage.getItem('__X-Access-Token');
         headers['Content-Type'] = 'application/json';
-        const resp = await cc.doRequest(urlOrString, 'POST', null, json, headers, 'json');
+        const resp = await cc.doRequest(urlOrString, 'POST', null, JSON.stringify(json), headers, 'json');
         return extractResponseContent(resp);
     }
 
