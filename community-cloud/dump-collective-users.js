@@ -6,10 +6,11 @@
 // @author       ashen
 // @match        http://10.87.105.104/communityorg/CommunityOrgList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
-// @grant        none
+// @grant        GM_registerMenuCommand
 // ==/UserScript==
 
 /* global cc */
+/* global GM_registerMenuCommand */
 
 (function () {
     "use strict";
@@ -71,15 +72,15 @@
         console.log("stopped dumping");
     }
 
-    document.addEventListener("keydown", (e) => {
-        if (e.altKey && e.key === "k") {
+    window.addEventListener("load", () => {
+        GM_registerMenuCommand("Dump Users", () => {
             if (!g_running && confirm("begin dumping?")) {
                 g_running = true;
                 dumpUsers();
             } else if (g_running) {
                 g_running = false;
             }
-        }
+        });
     });
 })();
 

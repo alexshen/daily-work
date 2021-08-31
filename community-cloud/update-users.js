@@ -6,10 +6,11 @@
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
-// @grant        none
+// @grant        GM_registerMenuCommand
 // ==/UserScript==
 
 /* global cc */
+/* global GM_registerMenuCommand */
 
 (function () {
     'use strict';
@@ -218,8 +219,8 @@
         }
     }
 
-    document.addEventListener('keydown', (event) => {
-        if (event.key === '3' && event.altKey) {
+    window.addEventListener('load', () => {
+        GM_registerMenuCommand("Update From File", () => {
             let input = document.createElement('input');
             input.type = 'file';
             input.onchange = e => {
@@ -231,10 +232,10 @@
                     });
             };
             input.click();
-        }
-        if (event.key === '4' && event.altKey) {
+        });
+        GM_registerMenuCommand("Stop Updating", () => {
             g_stop = true;
             console.log('stop updating');
-        }
+        });
     });
 })();

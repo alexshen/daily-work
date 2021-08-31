@@ -6,10 +6,11 @@
 // @author       ashen
 // @match        http://10.87.105.104/datacollector/modules/FormManager2*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
-// @grant        none
+// @grant        GM_registerMenuCommand
 // ==/UserScript==
 
 /* global cc */
+/* global GM_registerMenuCommand */
 
 (function () {
     "use strict";
@@ -376,20 +377,15 @@
         }
     }
 
-    document.addEventListener("keydown", (e) => {
-        if (e.altKey && e.key === "1") {
+    window.addEventListener("load", () => {
+        GM_registerMenuCommand("Update Users", () => {
             updateUsers();
-        }
-        if (e.altKey && e.key === "2") {
-            g_stop = true;
-            console.log("stop updating");
-        }
-        if (e.altKey && e.key === "3") {
+        });
+        GM_registerMenuCommand("Delete Incomplete Users", () => {
             deleteIncompleteUsers();
-        }
-        if (e.altKey && e.key === "4") {
+        });
+        GM_registerMenuCommand("Stop Operations", () => {
             g_stop = true;
-            console.log("stop deleting");
-        }
+        });
     });
 })();
