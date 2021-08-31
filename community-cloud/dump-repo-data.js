@@ -6,15 +6,14 @@
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
-// @grant        none
+// @grant        GM_registerMenuCommand
 // ==/UserScript==
 
 /* global cc */
+/* global GM_registerMenuCommand */
 
 (function () {
     "use strict";
-
-    let g_running = false;
 
     function currentVisibleTab() {
         return document.querySelector(
@@ -22,11 +21,11 @@
         );
     }
 
-    async function dumpElement(textExtractor) {
+    async function dumpElement(textExtractor, token) {
         const currentTab = currentVisibleTab();
         const nextPageButton = currentTab.querySelector("li.ant-pagination-next");
         const records = [];
-        while (g_running) {
+        while (!token.isStopped) {
             for (let row of currentTab.querySelectorAll("div.ant-table-scroll tbody.ant-table-tbody tr")) {
                 records.push(textExtractor(row));
             }
@@ -41,27 +40,43 @@
     }
 
     const ADDRESS_COLS = [4, 5];
-
-    function dumpAddresses() {
-        dumpElement((row) => {
-            for (let col of ADDRESS_COLS) {
-                const addrElem = row.querySelector(`td:nth-child(${col}) span span:last-child`);
-                if (addrElem) {
-                    return addrElem.innerText;
-                }
-            } 
-            throw new Error(`cannot find address for ${row}`);
-        });
+    function getAddress(row) {
+        for (let col of ADDRESS_COLS) {
+            const addrElem = row.querySelector(`td:nth-child(${col}) span span:last-child`);
+            if (addrElem) {
+                return addrElem.innerText;
+            }
+        } 
+        throw new Error(`cannot find address for ${row}`);
     }
 
-    document.addEventListener("keydown", (e) => {
-        if (e.altKey && e.key === "l") {
-            if (!g_running && confirm("begin dumping?")) {
-                g_running = true;
-                dumpAddresses();
-            } else if (g_running) {
-                g_running = false;
-            }
+    function getId(row) {
+        return row.getAttribute('data-row-key')
+    }
+
+    let g_currentTaskToken;
+    function stopCurrentTask() {
+        if (g_currentTaskToken) {
+            g_currentTaskToken.stop();
+            g_currentTaskToken = null;
         }
+    }
+
+    window.addEventListener("load", () => {
+        GM_registerMenuCommand("Dump Addresses", () => {
+            stopCurrentTask();
+            if (confirm("begin dumping?")) {
+                g_currentTaskToken = new cc.StopToken();
+                dumpElement(getAddress, g_currentTaskToken);
+            }
+        });
+
+        GM_registerMenuCommand("Dump Ids", () => {
+            stopCurrentTask();
+            if (confirm("begin dumping?")) {
+                g_currentTaskToken = new cc.StopToken();
+                dumpElement(getId, g_currentTaskToken);
+            }
+        });
     });
 })();
