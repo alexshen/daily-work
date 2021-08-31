@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Remove Collective Users
+// @name         Collective Users
 // @namespace    http://tampermonkey.net/
-// @version      0.2
-// @description  Remove Collective Users
+// @version      0.5
+// @description  Tools for Collective Users
 // @author       ashen
 // @match        http://10.87.105.104/communityorg/CommunityOrgList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
@@ -72,6 +72,54 @@
         }
     }
 
+    // order of user fields
+    // UF_UUID
+    // UF_NAME
+    // UF_ID_NUMBER
+    // UF_PERM_ADDR
+    // UF_POP_TYPE
+    // UF_RESIDENCE_ADDR
+
+    async function parseUsers(resp) {
+        const users = [];
+        for (let record of resp.result.records) {
+            const fields = [
+                record.id,
+                record.realName, 
+                record.cardId, 
+                record.permanentAddress, 
+                record.personTypeCode,
+                record.residenceAddress,
+            ];
+            users.push(fields.join('\t'));
+        }
+        return users;
+    }
+
+    async function dumpUsers(token) {
+        const currentTab = currentVisibleTab();
+        const nextPageButton = currentTab.querySelector("li.ant-pagination-next");
+        const records = [];
+        // force querying the first page
+        let resp = await cc.waitUntilRequestDone(() => {
+            currentTab.querySelector("div.btn-group-wrapper button:first-child").click();
+        });
+
+        while (!token.isStopped) {
+            if (resp.status !== 200) {
+                throw new Error('request error');
+            }
+            records.push(...await parseUsers(JSON.parse(resp.response)));
+            if (nextPageButton.getAttribute("class").includes("ant-pagination-disabled")) {
+                break;
+            }
+            resp = await cc.waitUntilRequestDone(() => nextPageButton.click());
+            await cc.delay(150);
+        }
+        console.log(records.join("\n"));
+        console.log("stopped dumping");
+    }
+
     window.addEventListener('load', () => {
         GM_registerMenuCommand('Remove Current User Pages', () => {
             stopCurrentTask();
@@ -85,6 +133,14 @@
             stopCurrentTask();
             g_curTaskToken = new cc.StopToken();
             removeUsersFromFile(g_curTaskToken);
+        });
+        
+        GM_registerMenuCommand("Dump Users", () => {
+            stopCurrentTask();
+            if (confirm("begin dumping?")) {
+                g_curTaskToken = new cc.StopToken();
+                dumpUsers(g_curTaskToken);
+            }
         });
     });
 })();
