@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Dump Record from Repo
+// @name         Local Repo Tools
 // @namespace    http://tampermonkey.net/
-// @version      0.2
-// @description  Dump currently listed records from the local repo
+// @version      0.3
+// @description  Tools for the local repo module
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
