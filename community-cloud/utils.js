@@ -27,8 +27,23 @@ window.ccu = (function() {
         return extractResponseContent(resp);
     }
 
+    async function selectFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        let files;
+        input.onchange = e => {
+            files = e.target.files;
+        };
+        input.click();
+        while (!files) {
+            await cc.delay(100);
+        }
+        return files[0];
+    }
+
     return {
         get: get,
         postJson: postJson,
+        selectFile: selectFile,
     };
 })();

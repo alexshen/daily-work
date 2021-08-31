@@ -15,8 +15,6 @@
 (function () {
     "use strict";
 
-    let g_running = false;
-
     // wait until the next request is finished
     function currentVisibleTab() {
         return document.querySelector(
@@ -33,30 +31,60 @@
         await ccu.postJson(REMOVE_COLLECTIVE_USER_URL, {temporaryPersonId: id});
     }
 
-    async function removeCurrentPageUsers() {
+    async function removeCurrentPageUsers(token) {
         for (let row of currentVisibleTab().querySelectorAll('div.ant-table-scroll tbody tr')) {
             const name = row.querySelector('td span.realname').innerText;
             const address = row.querySelector('td:nth-child(3) > span span:last-child').innerText;
             console.log(`removing ${name} at ${address}`);
             await removeUser(row.getAttribute('data-row-key'));
             await cc.delay(100);
-            if (!g_running) {
+            if (token.isStopped) {
                 break;
             }
         }
         alert("*** finished");
     }
 
+    async function removeUsersById(ids, token) {
+        for (let id of ids) {
+            await removeUser(id);
+            if (token.isStopped) {
+                break;
+            }
+        }
+        alert("*** finished");
+    }
+
+    async function removeUsersFromFile(token) {
+        const name = await ccu.selectFile();
+        if (name) {
+            await removeUsersById(await cc.readLines(name), token);
+        }
+    }
+
     const SHORTCUT_MANAGER = new cc.ShortcutManager();
+    let g_curTaskToken;
+
+    function stopCurrentTask() {
+        if (g_curTaskToken) {
+            g_curTaskToken.stop();
+            g_curTaskToken = null;
+        }
+    }
 
     window.addEventListener('load', () => {
         SHORTCUT_MANAGER.register(cc.SHORTCUT.Alt, 'or', () => {
-            if (!g_running && confirm("remove current page users?")) {
-                g_running = true;
-                removeCurrentPageUsers();
-            } else if (g_running) {
-                g_running = false;
+            stopCurrentTask();
+            if (confirm("remove current page users?")) {
+                g_curTaskToken = new cc.StopToken();
+                removeCurrentPageUsers(g_curTaskToken);
             }
+        });
+
+        SHORTCUT_MANAGER.register(cc.SHORTCUT.Alt, 'of', () => {
+            stopCurrentTask();
+            g_curTaskToken = new cc.StopToken();
+            removeUsersFromFile(g_curTaskToken);
         });
     });
 

@@ -136,6 +136,11 @@ window.cc = (function() {
         });
     }
 
+    async function readLines(filename) {
+        const data = await readFile(filename);
+        return data.split(/\r\n?|\n/)
+    }
+
     /**
      * Populate an object with keys and values.
      * If there are more keys than values, the corresponding values will be set to null.
@@ -316,6 +321,20 @@ window.cc = (function() {
         }
     }
 
+    class StopToken {
+        constructor() {
+            this._isStopped = false;
+        }
+
+        get isStopped() {
+            return this._isStopped;
+        }
+
+        stop() {
+            this._isStopped = true;
+        }
+    }
+
     return {
         delay: delay,
         XHRInterceptor: XHRInterceptor,
@@ -327,5 +346,7 @@ window.cc = (function() {
         doRequest: doRequest,
         SHORTCUT: SHORTCUT,
         ShortcutManager: ShortcutManager,
+        StopToken: StopToken,
+        readLines: readLines,
     };
 })();
