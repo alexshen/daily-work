@@ -48,6 +48,7 @@
     async function removeUsersById(ids, token) {
         for (let id of ids) {
             await removeUser(id);
+            await cc.delay(100);
             if (token.isStopped) {
                 break;
             }
