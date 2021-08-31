@@ -7,10 +7,11 @@
 // @match        http://10.87.105.104/communityorg/CommunityOrgList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/utils.js
-// @grant        none
+// @grant        GM_registerMenuCommand
 // ==/UserScript==
 
 /* global cc, ccu */
+/* global GM_registerMenuCommand */
 
 (function () {
     "use strict";
@@ -63,9 +64,7 @@
         }
     }
 
-    const SHORTCUT_MANAGER = new cc.ShortcutManager();
     let g_curTaskToken;
-
     function stopCurrentTask() {
         if (g_curTaskToken) {
             g_curTaskToken.stop();
@@ -74,7 +73,7 @@
     }
 
     window.addEventListener('load', () => {
-        SHORTCUT_MANAGER.register(cc.SHORTCUT.Alt, 'or', () => {
+        GM_registerMenuCommand('Remove Current User Pages', () => {
             stopCurrentTask();
             if (confirm("remove current page users?")) {
                 g_curTaskToken = new cc.StopToken();
@@ -82,13 +81,10 @@
             }
         });
 
-        SHORTCUT_MANAGER.register(cc.SHORTCUT.Alt, 'of', () => {
+        GM_registerMenuCommand('Remove Users From File', () => {
             stopCurrentTask();
             g_curTaskToken = new cc.StopToken();
             removeUsersFromFile(g_curTaskToken);
         });
     });
-
-    document.addEventListener("keydown", e => SHORTCUT_MANAGER.onKeyDown(e));
-    document.addEventListener("keyup", e => SHORTCUT_MANAGER.onKeyUp(e));
 })();
