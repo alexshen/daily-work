@@ -15,6 +15,7 @@ window.ccu = (function() {
 
     async function get(urlOrString, params, headers) {
         headers['X-Access-Token'] = window.localStorage.getItem('__X-Access-Token');
+        params['_t'] = Date.now() / 1000 | 0;
         const resp =  await cc.doRequest(urlOrString, 'GET', params, null, headers, 'json');
         return extractResponseContent(resp);
     }
