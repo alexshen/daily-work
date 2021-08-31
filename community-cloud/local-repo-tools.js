@@ -6,10 +6,11 @@
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
+// @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/utils.js
 // @grant        GM_registerMenuCommand
 // ==/UserScript==
 
-/* global cc */
+/* global cc, ccu */
 /* global GM_registerMenuCommand */
 
 (function () {
@@ -54,6 +55,29 @@
         return row.getAttribute('data-row-key')
     }
 
+    const REMOVE_USER_URL = new URL(
+        '/community-cloud/archives/personChangedRecord/addFromPersonBase',
+        window.document.location
+    );
+
+    async function removeUser(user) {
+        await ccu.get(REMOVE_USER_URL, user);
+    }
+
+    async function removeUsersFromFile(token) {
+        const records = await cc.readRecords(await ccu.selectFile());
+        for (let i = 0; i < records.length; ++i) {
+            const r = records[i];
+            console.log(`removing [${i + 1}/${records.length}] with id ${r.infoId}`);
+            await removeUser(r);
+            await cc.delay(100);
+            if (token.isStopped) {
+                break;
+            }
+        }
+        console.log('*** stopped removing');
+    }
+
     let g_currentTaskToken;
     function stopCurrentTask() {
         if (g_currentTaskToken) {
@@ -77,6 +101,12 @@
                 g_currentTaskToken = new cc.StopToken();
                 dumpElement(getId, g_currentTaskToken);
             }
+        });
+
+        GM_registerMenuCommand("Remove Users From File", () => {
+            stopCurrentTask();
+            g_currentTaskToken = new cc.StopToken();
+            removeUsersFromFile(g_currentTaskToken);
         });
     });
 })();
