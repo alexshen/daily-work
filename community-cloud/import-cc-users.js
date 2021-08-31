@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Import New Users for Community Cloud
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Import new users based on their resident addresses
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList*

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Local Repo Tools
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Tools for the local repo module
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList

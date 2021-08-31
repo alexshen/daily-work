@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Remove Users
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.2
 // @description  try to take over the world!
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList

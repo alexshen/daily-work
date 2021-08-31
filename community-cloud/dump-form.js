@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump Form
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Dump current form data
 // @author       ashen
 // @match        http://10.87.105.104/datacollector/modules/FormManager2*

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Update User Info
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Update user info with the data from a file
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList

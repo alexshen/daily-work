@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Update Form Users
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Update user records with data from a file
 // @author       ashen
 // @match        http://10.87.105.104/datacollector/modules/FormManager2*

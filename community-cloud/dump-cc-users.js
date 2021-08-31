@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump CC Users
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Dump currently listed cc users
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
