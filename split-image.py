@@ -8,11 +8,13 @@ import os
 
 def is_blank_line(im, y, bg_color):
     pa = im.load()
+    rgb = bg_color[:3]
     for x in range(im.size[0]):
         c = pa[x, y]
+        # skip transparent pixels
         if len(c) == 4 and c[3] == 0:
             continue
-        if pa[x, y][:3] != bg_color:
+        if pa[x, y][:3] != rgb:
             return False
     return True
 
