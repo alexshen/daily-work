@@ -17,6 +17,18 @@
 
     let g_running = false;
 
+    const HEADERS = [
+        'UUID',
+        '居住地址',
+        '姓名',
+        '电话',
+        '接种时间',
+        '疫苗ID',
+        '接种状态',
+        '备注',
+        '未接种原因'
+    ];
+
     function format(record) {
         // find the first living house
         const livingHouses = JSON.parse(record.personHouses);
@@ -55,7 +67,7 @@
         });
 
         const nextPageButton = document.querySelector("li.ant-pagination-next");
-        const records = [];
+        const records = [HEADERS.join('\t')];
         while (g_running) {
             records.splice(records.length, 0, ...getFormattedRecords(JSON.parse(resp.response).result.records));
             if (nextPageButton.getAttribute("class").includes("ant-pagination-disabled")) {

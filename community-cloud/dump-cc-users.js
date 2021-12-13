@@ -33,12 +33,28 @@
     // UF_POP_TYPE
     // UF_IS_RESIDENT
     // UF_SAME_PERM_ADDR
-    // UF_SAME_RESIDENT_ADDR
     // UF_IS_OWNER
     // UF_ADDR_LONG
     // UF_ADDR_UNIT
     // UF_ADDR_ROOM
     // UF_FLAGS
+
+    const HEADERS = [
+        'UUID',
+        '姓名',
+        '身份证',
+        '电话',
+        '户籍地址',
+        '居住地址',
+        '人员类型',
+        '本房居住',
+        '本房户籍',
+        '本房业主',
+        '弄',
+        '号',
+        '室',
+        '社区标识'
+    ];
 
     async function getMainResidentAddress(userId) {
         const url = new URL('/community-cloud/archives/personArchives/queryByIdThrong', document.location.origin);
@@ -105,7 +121,7 @@
     async function dumpUsers(withResidentAddr) {
         const currentTab = currentVisibleTab();
         const nextPageButton = currentTab.querySelector("li.ant-pagination-next");
-        const records = [];
+        const records = [HEADERS.join('\t')];
         // force querying the first page
         let resp = await cc.waitUntilRequestDone(() => {
             currentTab.querySelector("div.table-page-search-wrapper button:first-child").click();
