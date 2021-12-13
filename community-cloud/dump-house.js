@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump House Data
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.2
 // @description  Dump house data
 // @author       ashen
 // @match        http://10.87.105.104/communityorg/CommunityOrgList
@@ -15,6 +15,11 @@
 
 (function () {
     "use strict";
+
+    const HEADERS = [
+        '地址',
+        '房屋标签'
+    ];
 
     // wait until the next request is finished
     function currentVisibleTab() {
@@ -34,9 +39,8 @@
     async function parseHouse(resp) {
         const houses = [];
         for (let record of resp.result.records) {
-            const match = /(\d+)弄\/(\d+)号楼\/(\d+)/g.exec(record.houseAddress);
             const fields = [
-                match[1], match[2], match[3],
+                record.houseAddress,
                 record.tagInfoList.map(x => x.tagName).join(','),
             ];
             houses.push(fields.join('\t'));
@@ -47,7 +51,7 @@
     async function dumpHouses(token) {
         const currentTab = currentVisibleTab();
         const nextPageButton = currentTab.querySelector("li.ant-pagination-next");
-        const records = [];
+        const records = [HEADERS.join('\t')];
         // force querying the first page
         let resp = await cc.waitUntilRequestDone(() => {
             currentTab.querySelector("div.search-btn button:last-child").click();
