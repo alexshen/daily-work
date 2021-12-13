@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump Vaccination Records
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Dump currently listed vaccination records
 // @author       ashen
 // @match        http://10.87.105.104/keyWord/Vaccination
