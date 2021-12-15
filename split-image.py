@@ -35,11 +35,12 @@ def try_split(im, top, bottom, bg_color):
     return bottom
 
 
-_VALID_FORMATS = ('.jpg', '.png')
 _OUTPUT_MODES = {
     '.jpg': 'RGB',
+    '.jpeg': 'RGB',
     '.png': 'RGBA'
 }
+_VALID_FORMATS = sorted(_OUTPUT_MODES.keys())
 
 
 def validate_format(s):
