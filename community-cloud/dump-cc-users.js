@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump CC Users
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.7
 // @description  Dump currently listed cc users
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
@@ -91,7 +91,7 @@
                 requests.push(getMainResidentAddress(record.id));
                 await cc.delay(100);
             }
-            residentAddresses.splice(0, 0, await Promise.all(requests));
+            residentAddresses.splice(0, 0, ...await Promise.all(requests));
         }
 
         for (let i = 0; i < resp.result.records.length; ++i) {
