@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump CC Users
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Dump currently listed cc users
 // @author       ashen
 // @match        http://10.87.105.104/person/PersonInfoList
@@ -83,8 +83,20 @@
 
     async function parseUsers(resp, withResidentAddr) {
         const users = [];
-        for (let record of resp.result.records) {
-            const residentAddr = withResidentAddr ? await getMainResidentAddress(record.id) : '';
+        const residentAddresses = [];
+
+        if (withResidentAddr) {
+            const requests = [];
+            for (let record of resp.result.records) {
+                requests.push(getMainResidentAddress(record.id));
+                await cc.delay(100);
+            }
+            residentAddresses.splice(0, 0, await Promise.all(requests));
+        }
+
+        for (let i = 0; i < resp.result.records.length; ++i) {
+            const record = resp.result.records[i];
+            const residentAddr = withResidentAddr ? residentAddresses[i] : '';
             for (let house of JSON.parse(record.personHouses)) {
                 const match = /(\d+)弄\/(\d+)号楼\/(\d+)/g.exec(house.houseAddress);
                 const fields = [
@@ -143,10 +155,19 @@
     }
 
     window.addEventListener("load", () => {
-        GM_registerMenuCommand("Dump Users", () => {
+        GM_registerMenuCommand("Dump Users w/o Resident Address", () => {
             if (!g_running && confirm("begin dumping?")) {
                 g_running = true;
                 dumpUsers(false);
+            } else if (g_running) {
+                g_running = false;
+            }
+        });
+
+        GM_registerMenuCommand("Dump Users w/ Resident Address", () => {
+            if (!g_running && confirm("begin dumping?")) {
+                g_running = true;
+                dumpUsers(true);
             } else if (g_running) {
                 g_running = false;
             }
