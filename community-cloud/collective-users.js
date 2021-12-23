@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Collective Users
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Tools for Collective Users
 // @author       ashen
-// @match        http://10.87.105.104/communityorg/CommunityOrgList
+// @match        http://sqy.mzj.sh.gov.cn/communityorg/CommunityOrgList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/utils.js
 // @grant        GM_registerMenuCommand

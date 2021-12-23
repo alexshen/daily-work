@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Update User Info
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Update user info with the data from a file
 // @author       ashen
-// @match        http://10.87.105.104/person/PersonInfoList
+// @match        http://sqy.mzj.sh.gov.cn/person/PersonInfoList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        GM_registerMenuCommand
 // ==/UserScript==
