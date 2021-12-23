@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Dump CC Users
 // @namespace    http://tampermonkey.net/
-// @version      0.8
+// @version      0.9
 // @description  Dump currently listed cc users
 // @author       ashen
-// @match        http://sqy.mzj.sh.gov.cn/person/PersonInfoList
+// @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        GM_registerMenuCommand
 // ==/UserScript==

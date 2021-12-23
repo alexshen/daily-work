@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Dump Form
 // @namespace    http://tampermonkey.net/
-// @version      0.4
+// @version      0.5
 // @description  Dump current form data
 // @author       ashen
-// @match        http://sqy.mzj.sh.gov.cn/datacollector/modules/FormManager2*
+// @match        https://sqy.mzj.sh.gov.cn/datacollector/modules/FormManager2*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        GM_registerMenuCommand
 // ==/UserScript==

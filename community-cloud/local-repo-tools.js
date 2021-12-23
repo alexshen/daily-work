@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Local Repo Tools
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Tools for the local repo module
 // @author       ashen
-// @match        http://sqy.mzj.sh.gov.cn/person/PersonInfoList
+// @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/utils.js
 // @grant        GM_registerMenuCommand

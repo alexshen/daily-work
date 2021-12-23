@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Dump Vaccination Records
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Dump currently listed vaccination records
 // @author       ashen
-// @match        http://sqy.mzj.sh.gov.cn/keyWord/Vaccination
+// @match        https://sqy.mzj.sh.gov.cn/keyWord/Vaccination
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        GM_registerMenuCommand
 // ==/UserScript==

@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Dump House Data
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Dump house data
 // @author       ashen
-// @match        http://sqy.mzj.sh.gov.cn/communityorg/CommunityOrgList
+// @match        https://sqy.mzj.sh.gov.cn/communityorg/CommunityOrgList
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/utils.js
 // @grant        GM_registerMenuCommand

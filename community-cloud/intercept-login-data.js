@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Intercept Login Data
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Intercept login requests so that we can save X-Access-Token for later use
 // @author       ashen
-// @match        http://sqy.mzj.sh.gov.cn/user/login*
+// @match        https://sqy.mzj.sh.gov.cn/user/login*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        none
 // ==/UserScript==

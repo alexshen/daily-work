@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Import New Users for Community Cloud
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Import new users based on their resident addresses
 // @author       ashen
-// @match        http://sqy.mzj.sh.gov.cn/person/PersonInfoList*
+// @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
 // @grant        GM_registerMenuCommand
 // ==/UserScript==
