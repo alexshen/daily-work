@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump CC Users
 // @namespace    http://tampermonkey.net/
-// @version      0.9
+// @version      0.10
 // @description  Dump currently listed cc users
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList
@@ -152,6 +152,7 @@
         }
         console.log(records.join("\n"));
         console.log("stopped dumping");
+        g_running = false;
     }
 
     window.addEventListener("load", () => {

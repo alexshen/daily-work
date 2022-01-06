@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump Vaccination Records
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.7
 // @description  Dump currently listed vaccination records
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/keyWord/Vaccination
@@ -78,6 +78,7 @@
         }
         console.log(records.join("\n"));
         console.log("stopped dumping");
+        g_running = false;
     }
 
     window.addEventListener("load", () => {

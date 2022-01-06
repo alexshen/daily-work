@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump Form
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Dump current form data
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/datacollector/modules/FormManager2*
@@ -47,6 +47,7 @@
         }
         console.log(records.join("\n"));
         console.log("stopped dumping");
+        g_running = false;
     }
 
     window.addEventListener("load", () => {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Import New Users for Community Cloud
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.7
 // @description  Import new users based on their resident addresses
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList*
@@ -263,6 +263,7 @@
             }
         } else {
             alert('finish importing');
+            g_stop = true;
         }
     }
 
