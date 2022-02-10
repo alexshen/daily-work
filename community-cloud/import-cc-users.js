@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Import New Users for Community Cloud
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      0.8
 // @description  Import new users based on their resident addresses
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList*
@@ -42,6 +42,10 @@
         '南大路8弄3号': '社区相关地址/周围单位或商铺',
         '南大路28号': '社区相关地址/周围单位或商铺'
     };
+
+    const MOVED_ADDRESSES = [
+        '大场西街', '大场西后街'
+    ];
 
     function isLocalCommunityAddr(addr) {
         let longs = VALID_LONGS[addr[0]];
@@ -145,6 +149,10 @@
         return Object.keys(COLLECTIVE_ADDRESSES).some(e => addr.startsWith(e));
     }
 
+    function isMovedAddress(addr) {
+        return MOVED_ADDRESSES.some(e => addr.startsWith(e));
+    }
+
     function parseAddress(addr) {
         const RE_ADDR = /^(.+?)(\d+)弄(\d+)号(\d+)室$/;
         const result = RE_ADDR.exec(addr);
@@ -153,6 +161,8 @@
         }
         return result;
     }
+
+    const IMPORT_ADDRESS_FOR_MOVED_RESIDENTS = parseAddress('南大路6弄6号103室')
 
     function currentVisibleTab() {
         return document.querySelector('.main > div > div > div > div:not(.ant-tabs):not([style*="display: none"])');
@@ -170,6 +180,7 @@
 
         const isCollectiveResidentAddr = isCollectiveAddress(residentAddrStr);
         const isCollectivePermanentAddr = isCollectiveAddress(permanentAddrStr);
+        const isMovedPermanentAddr = isMovedAddress(permanentAddrStr);
 
         const isLocalResidentAddr = residentAddr !== null && isLocalCommunityAddr(residentAddr);
         const isLocalPermanentAddr = permanentAddr !== null && isLocalCommunityAddr(permanentAddr);
@@ -177,7 +188,8 @@
         const realName = row.querySelector('td:nth-child(3) .realname').innerText;
 
         if (!isLocalResidentAddr && !isLocalPermanentAddr &&
-            !isCollectiveResidentAddr && !isCollectivePermanentAddr) {
+            !isCollectiveResidentAddr && !isCollectivePermanentAddr &&
+            !isMovedPermanentAddr) {
             console.log(`*** ${realName} moved away`);
 
             // report that the user has moved away
@@ -218,9 +230,9 @@
         } else {
             importButton.click();
             await waitUntilPersonInfoHasLoaded()
-            console.assert(isLocalResidentAddr || isLocalPermanentAddr, 'at least one address must be local');
+            console.assert(isLocalResidentAddr || isLocalPermanentAddr || isMovedPermanentAddr, 'at least one address must be local');
 
-            if (residentAddrStr === permanentAddrStr) {
+            if (residentAddrStr === permanentAddrStr && !isMovedPermanentAddr) {
                 console.assert(isLocalResidentAddr && isLocalPermanentAddr);
                 await addApartment(residentAddr, true, true, true);
             } else {
@@ -230,6 +242,10 @@
 
                 if (isLocalPermanentAddr) {
                     await addApartment(permanentAddr, false, true, isShanghainese);
+                }
+
+                if (isMovedPermanentAddr) {
+                    await addApartment(IMPORT_ADDRESS_FOR_MOVED_RESIDENTS, false, true, false);
                 }
             }
 
