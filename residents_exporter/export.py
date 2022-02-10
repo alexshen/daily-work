@@ -162,7 +162,7 @@ class Exporter:
             self._residents.setdefault(row['关联房屋地址'], []).append(r)
 
     def _read_room_tags(self):
-        for row in TableReader(self._db_wb['房屋状态']):
+        for row in TableReader(self._db_wb['房屋标签']):
             if row['出租房']:
                 self._room_tags[row['简化地址']] = '出租房'
 
