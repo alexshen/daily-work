@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Local Repo Tools
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.7
 // @description  Tools for the local repo module
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList
@@ -78,6 +78,76 @@
         console.log('*** stopped removing');
     }
 
+    const FIND_USER_URL = new URL(
+        '/community-cloud/archives/personChangedRecord/list',
+        window.document.location
+    );
+
+    const DOWN_STATUS = {
+        ALL: 0,
+        IMPORTED: 1,
+        UNIMPORTED: 2,
+        ERROR: 3
+    };
+
+    async function* listResidents(name, status) {
+        // TODO: returns an iterator for all users
+        const params = {
+            downStatus: status,
+            auditState: -1,
+            SEARCHFLAG: false,
+            column: 'createTime',
+            order: 'desc',
+            field: 'id,,rowIndex,realName,residenceAddress,permanentAddress,createTime,downloadTime,downloadStatus',
+            pageSize: 10
+        };
+        if (name) {
+            params.keyWord = name;
+        }
+        let result;
+        let pageNo = 1;
+        do {
+            params.pageNo = pageNo;
+            result = await ccu.get(FIND_USER_URL, params);
+            for (let r of result.records) {
+                yield r;
+            }
+            ++pageNo;
+        } while (pageNo < result.pages);
+    }
+
+    const ROLLBACK_USER_URL = new URL(
+        '/community-cloud/archives/personChangedRecord/rollBack',
+        window.document.location
+    );
+
+    async function rollbackResident(id) {
+        await ccu.get(ROLLBACK_USER_URL, { id: id });
+    }
+
+    async function rollbackUsersFromFile(token) {
+        const records = await cc.readRecords(await ccu.selectFile());
+        for (let i = 0; i < records.length; ++i) {
+            const r = records[i];
+            console.log(`rollback [${i + 1}/${records.length}]: name ${r.name}, permanent address ${r.permAddr}`);
+            for await (let u of listResidents(r.name, DOWN_STATUS.ERROR)) {
+                if (u.permanentAddress === r.permAddr) {
+                    await rollbackResident(u.id);
+                    break;
+                }
+                if (token.isStopped) {
+                    break;
+                }
+                await cc.delay(100);
+            }
+            await cc.delay(100);
+            if (token.isStopped) {
+                break;
+            }
+        }
+        console.log('*** finished rollback');
+    }
+
     let g_currentTaskToken;
     function stopCurrentTask() {
         if (g_currentTaskToken) {
@@ -107,6 +177,12 @@
             stopCurrentTask();
             g_currentTaskToken = new cc.StopToken();
             removeUsersFromFile(g_currentTaskToken);
+        });
+
+        GM_registerMenuCommand("Rollback Users From File", () => {
+            stopCurrentTask();
+            g_currentTaskToken = new cc.StopToken();
+            rollbackUsersFromFile(g_currentTaskToken);
         });
     });
 })();
