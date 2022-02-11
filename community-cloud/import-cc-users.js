@@ -170,8 +170,8 @@
 
     async function processUser(row) {
         const isShanghainese = row.querySelector('td:nth-child(5) > span > span').innerText.startsWith('上海市');
-        const residentAddrStr = row.querySelector('td:nth-child(4) > span > span:last-child').innerText;
-        const permanentAddrStr = row.querySelector('td:nth-child(5) > span > span:last-child').innerText;
+        const residentAddrStr = row.querySelector('td:nth-child(4) > span > span:last-child')?.innerText || "";
+        const permanentAddrStr = row.querySelector('td:nth-child(5) > span > span:last-child')?.innerText || "";
 
         let [importButton, reportButton] = row.querySelectorAll('button');
 
