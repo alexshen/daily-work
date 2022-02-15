@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import community_cloud as cc
+import cloud
 import configparser
 import os
 import glob
@@ -66,7 +66,7 @@ it's the first time to login, you will be prompted to enter the username''')
     appcfg = configparser.ConfigParser()
     appcfg.read(os.path.join(dirname, 'config.ini'))
 
-    session = cc.Session(appcfg.get('app', 'api_endpoint'),
+    session = cloud.Session(appcfg.get('app', 'api_endpoint'),
                          appcfg.get('login', 'key'),
                          appcfg.get('login', 'iv'))
 
