@@ -103,11 +103,8 @@ class Session:
     def login(self):
         self._session = requests.Session()
 
-        app_data = self._get_token_and_appid()
-        auth_data = self._do_acccount(app_data)
-        self._do_verify(auth_data['auth_token'], app_data)
-        info = self._do_info(auth_data, app_data)
-        login_result = self._do_calogin(info['id_no'])
+        self._get_token_and_appid()
+        login_result = self._do_calogin()
         self._x_access_token = login_result['token']
         self._get_check_role(
             login_result['userInfo']['id'], login_result['departs'][0]['id'])
@@ -126,27 +123,15 @@ class Session:
                              {'account': self.username, 'pwd': m.hexdigest()},
                              app_data)
 
-    def _do_verify(self, auth_token, app_data):
-        return self._do_auth('/unitrust/token/verify', {'auth_token': auth_token}, app_data)
-
-    def _do_info(self, auth_data, app_data):
-        return self._do_auth('/unitrust/person/info', auth_data, app_data)
-
-    def _do_auth(self, path, json, app_data):
-        return self.post(path,
-                         headers={
-                             'UniTrust-AppId': app_data['appId'],
-                             'UniTrust-Token': app_data['accessToken']
-                         },
-                         json=json)
-
-    def _do_calogin(self, id_no):
-        payload = {'certificateNumber': id_no}
+    def _do_calogin(self):
         cipher = AES.new(self._aes_key.encode('utf-8'), AES.MODE_CBC,
                          self._aes_iv.encode('utf-8'))
         encrypted = cipher.encrypt(
-            self.username.encode('utf-8').ljust(AES.block_size, b'\x00'))
-        payload['username'] = base64.b64encode(encrypted).decode('utf-8')
+            self.password.encode('utf-8').ljust(AES.block_size, b'\x00'))
+        payload = {
+            'username': self.username,
+            'password': base64.b64encode(encrypted).decode('utf-8')
+        }
         return self.post('/sys/caLogin', json=payload)
 
     def _get_check_role(self, user_id, dept_id):
