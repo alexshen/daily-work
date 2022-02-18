@@ -89,7 +89,7 @@ it's the first time to login, you will be prompted to enter the username''')
     # restore the session if any
     sess_data = sess_cfg.get_session_data(username)
     if sess_data:
-        session.load(sess_data)
+        session.load(bytes(sess_data, encoding='utf-8'))
         password = session.password
 
     if not password or args.password:
@@ -102,7 +102,7 @@ it's the first time to login, you will be prompted to enter the username''')
         session.login()
 
     sess_cfg.last_login_username = username
-    sess_cfg.set_session_data(username, str(session.dump()))
+    sess_cfg.set_session_data(username, str(session.dump(), encoding='utf-8'))
     sess_cfg.save()
 
     # run the command
