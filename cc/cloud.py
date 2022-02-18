@@ -28,6 +28,8 @@ class Session:
         self._aes_iv = aes_iv
         self._x_access_token = None
         self._session = None
+        self._username = None
+        self._password = None
 
     @property
     def username(self):
