@@ -22,6 +22,38 @@ def die(msg, exit_code=1):
     sys.exit(exit_code)
 
 
+class SessionConfig:
+    def __init__(self, path):
+        self._path = path
+        self._cfg = configparser.ConfigParser()
+        self._cfg.read(path)
+        if 'last' not in self._cfg:
+            self._cfg['last'] = {}
+        self._section = self._cfg['last']
+
+    def save(self):
+        with open(self._path, 'w') as fp:
+            self._cfg.write(fp)
+
+    @property
+    def last_login_username(self):
+        return self._section.get('username', fallback='')
+
+    @last_login_username.setter
+    def last_login_username(self, username):
+        self._section['username'] = username
+
+    def get_session_data(self, username):
+        return self._section.get(self._get_username_key(username))
+
+    def set_session_data(self, username, data):
+        self._section[self._get_username_key(username)] = data
+
+    def _get_username_key(self, username):
+        # prefix the username to avoid collision with app keys
+        return '+' + username
+
+
 if __name__ == '__main__':
     dirname = os.path.dirname(__file__)
     argparser = argparse.ArgumentParser(prog='cc')
@@ -39,12 +71,11 @@ it's the first time to login, you will be prompted to enter the username''')
         parser = mod.register(subparsers)
     args = argparser.parse_args()
 
-    sess_cfg_path = os.path.join(os.path.expanduser('~'), '.ccsession')
-    sess_cfg = configparser.ConfigParser()
-    sess_cfg.read(sess_cfg_path)
+    sess_cfg = SessionConfig(os.path.join(
+        os.path.expanduser('~'), '.ccsession'))
 
     password = ''
-    username = args.username or sess_cfg.get('last', 'username', fallback='')
+    username = args.username or sess_cfg.last_login_username
     if not username:
         die('Please specify the username')
 
@@ -55,10 +86,8 @@ it's the first time to login, you will be prompted to enter the username''')
                             appcfg.get('login', 'key'),
                             appcfg.get('login', 'iv'))
 
-    # prefix the username to avoid collision with app keys
-    username_key = '+' + username
     # restore the session if any
-    sess_data = sess_cfg.get(username_key, 'state', fallback='')
+    sess_data = sess_cfg.get_session_data(username)
     if sess_data:
         session.load(sess_data)
         password = session.password
@@ -72,16 +101,9 @@ it's the first time to login, you will be prompted to enter the username''')
     if not session.validate():
         session.login()
 
-    # save the session
-    if not sess_cfg.has_section('last'):
-        sess_cfg.add_section('last')
-    if not sess_cfg.has_section(username_key):
-        sess_cfg.add_section(username_key)
-
-    sess_cfg.set('last', 'username', username)
-    sess_cfg.set(username_key, 'state', str(session.dump()))
-    with open(sess_cfg_path, 'w') as fp:
-        sess_cfg.write(fp)
+    sess_cfg.last_login_username = username
+    sess_cfg.set_session_data(username, str(session.dump()))
+    sess_cfg.save()
 
     # run the command
     args.func(session, args)
