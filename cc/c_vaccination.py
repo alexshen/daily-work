@@ -3,7 +3,7 @@ Vaccination Service Driver
 '''
 
 
-import community_cloud as cc
+import cloud
 
 
 def register(parent_parsers):
@@ -18,5 +18,5 @@ def register(parent_parsers):
     list_parser.set_defaults(func=list_main)
 
 
-def list_main(session: cc.Session, args):
+def list_main(session: cloud.Session, args):
     pass
