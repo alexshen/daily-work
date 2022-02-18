@@ -1,4 +1,4 @@
-import requests
+import httpx
 from datetime import datetime, timezone
 import hashlib
 from Crypto.Cipher import AES
@@ -10,16 +10,6 @@ class RequestError(Exception):
     pass
 
 
-class Auth(requests.auth.AuthBase):
-    def __init__(self, token):
-        self._token = token
-
-    def __call__(self, r):
-        if self._token:
-            r.headers['X-Access-Token'] = self._token
-        return r
-
-
 class Session:
 
     def __init__(self, api_endpoint, aes_key, aes_iv):
@@ -27,7 +17,7 @@ class Session:
         self._aes_key = aes_key
         self._aes_iv = aes_iv
         self._x_access_token = None
-        self._session = None
+        self._client = httpx.Client()
         self._username = None
         self._password = None
 
@@ -54,7 +44,7 @@ class Session:
         state = (
             self.username,
             self.password,
-            self._session,
+            dict(self._client.cookies.items()),
             self._x_access_token
         )
         return base64.b64encode(pickle.dumps(state))
@@ -64,23 +54,31 @@ class Session:
         restore the session state from the saved data
         '''
         self.username, self.password, \
-            self._session, self._x_access_token = pickle.loads(base64.b64decode(data))
+            cookies, self._x_access_token = pickle.loads(
+                base64.b64decode(data))
+        self._client.cookies.update(cookies)
 
     def post(self, path, headers=None, json=None):
-        r = self._session.post(self._api_endpoint + path,
-                               auth=Auth(self._x_access_token),
-                               headers=headers,
-                               json=json)
+        headers = self._set_token(headers)
+        r = self._client.post(self._api_endpoint + path,
+                              headers=headers,
+                              json=json)
         return self._validate_json_response(r)
 
     def get(self, path, headers=None, params=None):
         params = params or {}
         params['_t'] = int(datetime.now(timezone.utc).timestamp())
-        r = self._session.get(self._api_endpoint + path,
-                              auth=Auth(self._x_access_token),
-                              headers=headers,
-                              params=params)
+        headers = self._set_token(headers)
+        r = self._client.get(self._api_endpoint + path,
+                             headers=headers,
+                             params=params)
         return self._validate_json_response(r)
+
+    def _set_token(self, headers):
+        if self._x_access_token:
+            headers = headers or {}
+            headers['X-Access-Token'] = self._x_access_token
+        return headers
 
     def _validate_json_response(self, r):
         r.raise_for_status()
@@ -103,8 +101,6 @@ class Session:
         pass
 
     def login(self):
-        self._session = requests.Session()
-
         self._get_token_and_appid()
         login_result = self._do_calogin()
         self._x_access_token = login_result['token']
