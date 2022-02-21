@@ -4,10 +4,31 @@ import hashlib
 from Crypto.Cipher import AES
 import base64
 import pickle
+import configparser
 
 
 class RequestError(Exception):
     pass
+
+
+class AppConfig:
+    def __init__(self, path: str):
+        self._config = configparser.ConfigParser()
+        self._config.read(path)
+
+    def __getitem__(self, key: str):
+        '''
+        key is composed of two parts joined with a dot, e.g.
+            section.key
+
+        If key does not exist, raise KeyError
+        '''
+        try:
+            sec, sub_key = key.split('.')
+        except ValueError:
+            raise KeyError
+
+        return self._config[sec][sub_key]
 
 
 class Session:

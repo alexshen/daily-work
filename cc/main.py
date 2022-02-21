@@ -79,12 +79,10 @@ it's the first time to login, you will be prompted to enter the username''')
     if not username:
         die('Please specify the username')
 
-    appcfg = configparser.ConfigParser()
-    appcfg.read(os.path.join(dirname, 'config.ini'))
-
-    session = cloud.Session(appcfg.get('app', 'api_endpoint'),
-                            appcfg.get('login', 'key'),
-                            appcfg.get('login', 'iv'))
+    appcfg = cloud.AppConfig(os.path.join(dirname, 'config.ini'))
+    session = cloud.Session(appcfg['app.api_endpoint'],
+                            appcfg['login.key'],
+                            appcfg['login.iv'])
 
     # restore the session if any
     sess_data = sess_cfg.get_session_data(username)
