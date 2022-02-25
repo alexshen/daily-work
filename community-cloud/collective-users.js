@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Collective Users
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      0.8
 // @description  Tools for Collective Users
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/communityorg/CommunityOrgList
@@ -72,19 +72,21 @@
         }
     }
 
-    // order of user fields
-    // UF_UUID
-    // UF_NAME
-    // UF_ID_NUMBER
-    // UF_PERM_ADDR
-    // UF_POP_TYPE
-    // UF_RESIDENCE_ADDR
-
+    const HEADERS = [
+        'TemporaryId',
+        'UUID',
+        '姓名',
+        '身份证',
+        '户籍地址',
+        '人员类型',
+        '居住地址'
+    ];
     async function parseUsers(resp) {
         const users = [];
         for (let record of resp.result.records) {
             const fields = [
                 record.id,
+                record.personId,
                 record.realName, 
                 record.cardId, 
                 record.permanentAddress, 
@@ -99,7 +101,7 @@
     async function dumpUsers(token) {
         const currentTab = currentVisibleTab();
         const nextPageButton = currentTab.querySelector("li.ant-pagination-next");
-        const records = [];
+        const records = [HEADERS.join("\t")];
         // force querying the first page
         let resp = await cc.waitUntilRequestDone(() => {
             currentTab.querySelector("div.btn-group-wrapper button:first-child").click();
