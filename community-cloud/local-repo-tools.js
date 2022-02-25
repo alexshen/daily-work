@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Local Repo Tools
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      0.8
 // @description  Tools for the local repo module
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList
@@ -68,8 +68,12 @@
         const records = await cc.readRecords(await ccu.selectFile());
         for (let i = 0; i < records.length; ++i) {
             const r = records[i];
-            console.log(`removing [${i + 1}/${records.length}] with id ${r.infoId}`);
-            await removeUser(r);
+            try {
+                await removeUser(r);
+                console.log(`removed [${i + 1}/${records.length}] with id ${r.infoId}`);
+            } catch (e) {
+                console.error(`failed to remove ${r.infoId}, error: ${e}`);
+            }
             await cc.delay(100);
             if (token.isStopped) {
                 break;
