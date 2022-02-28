@@ -56,20 +56,20 @@ class SessionConfig:
 
 if __name__ == '__main__':
     dirname = os.path.dirname(__file__)
-    argparser = argparse.ArgumentParser(prog='cc')
-    argparser.add_argument('-u', '--username', default='', help='''specify the username, if not specified and 
+    rootparser = argparse.ArgumentParser(prog='cc')
+    rootparser.add_argument('-u', '--username', default='', help='''specify the username, if not specified and 
 it's the first time to login, you will be prompted to enter the username''')
-    argparser.add_argument(
+    rootparser.add_argument(
         '-p', '--password', action='store_true', help='prompt for the new password')
 
-    subparsers = argparser.add_subparsers(
+    subparsers = rootparser.add_subparsers(
         required=True, metavar='sub-commands')
     # register all sub commands
     for path in glob.glob(os.path.join(dirname, 'c_*.py')):
         fname = os.path.basename(path)
         mod = importlib.import_module(os.path.splitext(fname)[0])
-        parser = mod.register(subparsers)
-    args = argparser.parse_args()
+        parser = mod.register(rootparser, subparsers)
+    args = rootparser.parse_args()
 
     sess_cfg = SessionConfig(os.path.join(
         os.path.expanduser('~'), '.ccsession'))

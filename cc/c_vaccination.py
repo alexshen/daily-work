@@ -6,11 +6,11 @@ Vaccination Service Driver
 import cloud
 
 
-def register(parent_parsers):
-    parser = parent_parsers.add_parser('vac', help='vaccination services')
-    subparsers = parser.add_subparsers(required=True, metavar='sub-commands')
+def register(rootparser, subparsers):
+    vac_parser = subparsers.add_parser('vac', help='vaccination services')
+    vac_subparsers = vac_parser.add_subparsers(required=True, metavar='sub-commands')
 
-    list_parser = subparsers.add_parser(
+    list_parser = vac_subparsers.add_parser(
         'list', help='list vaccination records')
     list_parser.add_argument('-p', type=int, default=1, help='page number')
     list_parser.add_argument('-n', type=int, default=10,
