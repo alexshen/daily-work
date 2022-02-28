@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump CC Users
 // @namespace    http://tampermonkey.net/
-// @version      0.10
+// @version      0.11
 // @description  Dump currently listed cc users
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList
@@ -25,6 +25,7 @@
     }
 
     // order of user fields
+    // UF_BASE_ID
     // UF_UUID
     // UF_NAME
     // UF_ID_NUMBER
@@ -40,6 +41,7 @@
     // UF_FLAGS
 
     const HEADERS = [
+        'BaseID',
         'UUID',
         '姓名',
         '身份证',
@@ -100,6 +102,7 @@
             for (let house of JSON.parse(record.personHouses)) {
                 const match = /(\d+)弄\/(\d+)号楼\/(\d+)/g.exec(house.houseAddress);
                 const fields = [
+                    record.baseId,
                     record.id,
                     record.realName, 
                     record.cardIdOrg, 
