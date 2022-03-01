@@ -135,13 +135,6 @@ class Session:
     def _get_token_and_appid(self):
         return self.get('/sys/getAccessTokenAndAppId')
 
-    def _do_acccount(self, app_data):
-        m = hashlib.sha256()
-        m.update(self.password.encode('utf-8'))
-        return self._do_auth('/unitrust/login/account',
-                             {'account': self.username, 'pwd': m.hexdigest()},
-                             app_data)
-
     def _do_calogin(self):
         cipher = AES.new(self._aes_key.encode('utf-8'), AES.MODE_CBC,
                          self._aes_iv.encode('utf-8'))
