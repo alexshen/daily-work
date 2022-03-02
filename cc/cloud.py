@@ -10,6 +10,8 @@ import configparser
 class RequestError(Exception):
     pass
 
+class ExpirationError(Exception):
+    pass
 
 class AppConfig:
     def __init__(self, path: str):
@@ -102,8 +104,10 @@ class Session:
         return headers
 
     def _validate_json_response(self, r):
-        r.raise_for_status()
         res = r.json()
+        if r.status_code == 500 and 'Token失效' in res['message']:
+            raise ExpirationError()
+        r.raise_for_status()
         try:
             if res['code'] != 200 and res['code'] != 0:
                 raise RequestError(res['code'], res['message'])
@@ -119,7 +123,14 @@ class Session:
         '''
         validate the session, returns False if login is required
         '''
-        pass
+        if not self._x_access_token:
+            return False
+        try:
+            # issue an abritrary request to validate the session
+            self.get('/sys/annountCement/listByUser')
+            return True
+        except ExpirationError:
+            return False
 
     def login(self):
         self._get_token_and_appid()
