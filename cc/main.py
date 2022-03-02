@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 import cloud
-import configparser
+import app
 import os
 import glob
 import argparse
@@ -22,38 +22,6 @@ def die(msg, exit_code=1):
     sys.exit(exit_code)
 
 
-class SessionConfig:
-    def __init__(self, path):
-        self._path = path
-        self._cfg = configparser.ConfigParser()
-        self._cfg.read(path)
-        if 'last' not in self._cfg:
-            self._cfg['last'] = {}
-        self._section = self._cfg['last']
-
-    def save(self):
-        with open(self._path, 'w') as fp:
-            self._cfg.write(fp)
-
-    @property
-    def last_login_username(self):
-        return self._section.get('username', fallback='')
-
-    @last_login_username.setter
-    def last_login_username(self, username):
-        self._section['username'] = username
-
-    def get_session_data(self, username):
-        return self._section.get(self._get_username_key(username))
-
-    def set_session_data(self, username, data):
-        self._section[self._get_username_key(username)] = data
-
-    def _get_username_key(self, username):
-        # prefix the username to avoid collision with app keys
-        return '+' + username
-
-
 if __name__ == '__main__':
     dirname = os.path.dirname(__file__)
     rootparser = argparse.ArgumentParser(prog='cc')
@@ -68,10 +36,10 @@ it's the first time to login, you will be prompted to enter the username''')
     for path in glob.glob(os.path.join(dirname, 'c_*.py')):
         fname = os.path.basename(path)
         mod = importlib.import_module(os.path.splitext(fname)[0])
-        parser = mod.register(rootparser, subparsers)
+        mod.register(rootparser, subparsers)
     args = rootparser.parse_args()
 
-    sess_cfg = SessionConfig(os.path.join(
+    sess_cfg = app.SessionConfig(os.path.join(
         os.path.expanduser('~'), '.ccsession'))
 
     password = ''
@@ -103,5 +71,6 @@ it's the first time to login, you will be prompted to enter the username''')
     sess_cfg.set_session_data(username, str(session.dump(), encoding='utf-8'))
     sess_cfg.save()
 
+    context = app.AppContext(appcfg=appcfg, session=session)
     # run the command
-    args.func(session, args)
+    args.func(context, args)

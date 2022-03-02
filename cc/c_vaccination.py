@@ -3,7 +3,7 @@ Vaccination Service Driver
 '''
 
 
-import cloud
+import app
 
 
 def register(rootparser, subparsers):
@@ -18,5 +18,5 @@ def register(rootparser, subparsers):
     list_parser.set_defaults(func=list_main)
 
 
-def list_main(session: cloud.Session, args):
+def list_main(context: app.AppContext, args):
     pass
