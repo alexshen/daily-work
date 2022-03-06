@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like All New Posts
 // @author  ashen
-// @version 3
+// @version 0.4
 // @grant    none
 // @match https://www.juweitong.cn/*
 // ==/UserScript==
@@ -36,29 +36,7 @@ async function waitUntilPageAttached() {
     return await delay(500);
 }
 
-function getRandomComment() {
-    let comments = document.querySelector('div#replyList')?.querySelectorAll('pre');
-    if (comments) {
-        let comment = comments[Math.random() * comments.length | 0];
-        return comment ? comment.innerText : null;
-    }
-    return null;
-}
-
-function canComment() {
-    return document.querySelector('div.mi-reply-panel').children.length === 2;
-}
-
-async function doComment(comment) {
-    document.querySelector('div.mi-reply-panel').children[1].click();
-    await delay(500);
-    document.querySelector('textarea#ReplyContent').value = comment;
-    // post the comment
-    document.querySelector('div.mi-edit-panel.bottom').lastElementChild.click();
-    return await delay(1000);
-}
-
-async function likePost(post, needComment) {
+async function likePost(post) {
     // check if this is a new post
     if (post.querySelector('span.ui-1-tag.mi-q-new')) {
         // show the post
@@ -69,28 +47,18 @@ async function likePost(post, needComment) {
         if (likeButton.querySelector('span#cmdLike').innerText === '点赞') {
             likeButton.click();
             await delay(500);
-            // check if we need to comment the post
-            if (needComment && canComment()) {
-                let comment = getRandomComment();
-                if (!comment) {
-                    do {
-                        comment = prompt('Please enter the comment', '');
-                    } while (!comment);
-                }
-                await doComment(comment);
-            }
         }
         document.querySelector('a.mi-line-body').click();
         await waitUntilLoadingFinishes();
     }
 }
 
-async function likeAllPosts(needComment) {
+async function likeAllPosts() {
     // find all posts
     let posts = document.querySelectorAll('div.list-group-item.ui-1-article > a');
     console.log('number of posts: ' + posts.length);
     for (let post of posts) {
-        await likePost(post, needComment);
+        await likePost(post);
     }
     console.log('finish liking posts');
 }
@@ -101,24 +69,24 @@ async function back() {
     await waitUntilLoadingFinishes();
 }
 
-async function visitNotices(needComment) {
+async function visitNotices() {
     console.log('visit notices');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-notice');
     button.click();
     await waitUntilLoadingFinishes();
     document.querySelector('span.ui-1-sub-header-more').click();
     await waitUntilLoadingFinishes();
-    await likeAllPosts(needComment);
+    await likeAllPosts();
     await back();
     return await back();
 }
 
-async function visitMyNeighbors(needComment) {
+async function visitMyNeighbors() {
     console.log('visit my neighbors');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-around');
     button.click();
     await waitUntilLoadingFinishes();
-    await likeAllPosts(needComment);
+    await likeAllPosts();
     return await back();
 }
 
@@ -142,26 +110,6 @@ async function changeMember(i) {
     await delay(1000);
     document.querySelector('div.sqt-lib-roles-foot').lastElementChild.click();
 }
-
-/*
-function visitAllCommunities() {
-  new Promise(resolve => {
-    visitCommunityRecursive(0, resolve);
-  })
-  .then(() => alert('Finished'));
-                          
-    function visitCommunityRecursive(i, done) {
-    console.log('visiting ' + i);
-    if (i < NUM_COMMUNITIES) {
-      let needComment = i === 0;
-
-      changeMember(i + 1)
-            .then(() => visitCommunityRecursive(i + 1, done));
-    } else {
-            done();
-    }
-  }
-}*/
 
 document.addEventListener('keydown', evt => {
     if (!unsafeWindow.g_isPatched) {
@@ -196,10 +144,9 @@ document.addEventListener('keydown', evt => {
     }
 
     if (evt.ctrlKey && evt.key === '1') {
-        let needComment = confirm('Need commenting?');
-        visitNotices(needComment)
+        visitNotices()
             .then(() => waitUntilPageAttached())
-            .then(() => visitMyNeighbors(needComment))
+            .then(() => visitMyNeighbors())
             .then(() => waitUntilPageAttached())
             .then(() => visitPartyArea())
             .then(() => waitUntilPageAttached())
