@@ -3,10 +3,12 @@
 // ==UserScript==
 // @name    Like All New Posts
 // @author  ashen
-// @version 0.4
-// @grant    none
+// @version 0.5
+// @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // ==/UserScript==
+
+/* global GM_registerMenuCommand */
 
 function delay(time) {
     return new Promise(resolve => {
@@ -111,7 +113,7 @@ async function changeMember(i) {
     document.querySelector('div.sqt-lib-roles-foot').lastElementChild.click();
 }
 
-document.addEventListener('keydown', evt => {
+window.addEventListener('load', () => {
     if (!unsafeWindow.g_isPatched) {
         console.log('patching');
 
@@ -143,7 +145,7 @@ document.addEventListener('keydown', evt => {
         console.log('patched');
     }
 
-    if (evt.ctrlKey && evt.key === '1') {
+    GM_registerMenuCommand("Do Like", () => {
         visitNotices()
             .then(() => waitUntilPageAttached())
             .then(() => visitMyNeighbors())
@@ -151,12 +153,6 @@ document.addEventListener('keydown', evt => {
             .then(() => visitPartyArea())
             .then(() => waitUntilPageAttached())
             .then(() => alert('Finished'));
-    }
-    if (evt.altKey && evt.code.startsWith('Digit')) {
-        let i = parseInt(evt.code.substr(5));
-        if (i > 0) {
-            changeMember(i - 1);
-        }
-    }
+    });
 });
 
