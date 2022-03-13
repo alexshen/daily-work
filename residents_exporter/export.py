@@ -153,12 +153,13 @@ class TableRow:
 
 
 class Exporter:
-    def __init__(self, data_xlsx, output_dir, tag_regexes=[]):
+    def __init__(self, data_xlsx, output_dir, tag_regexes=[], exclude_tags=[]):
         self._db_wb = openpyxl.load_workbook(data_xlsx)
         self._output_dir = output_dir
         self._residents = {}
         self._room_tags = {}
         self._tag_regexes = [ re.compile(pat) for pat in tag_regexes ]
+        self._exclude_tags = set(exclude_tags)
 
         self._read_residents()
         self._read_room_tags()
@@ -169,13 +170,15 @@ class Exporter:
             if (row['年龄'] >= 90):
                 comments.append('90以上高龄')
             if row['社区标识']:
-                for regex in self._tag_regexes:
-                    for tag in row['社区标识'].split(','):
-                        for m in regex.finditer(tag):
-                            if len(m.groups()) > 0:
-                                comments.append(m[1])
-                            else:
-                                comments.append(m[0])
+                tags = set(row['社区标识'].split(','))
+                if not self._exclude_tags.isdisjoint(tags):
+                    for regex in self._tag_regexes:
+                        for tag in tags:
+                            for m in regex.finditer(tag):
+                                if len(m.groups()) > 0:
+                                    comments.append(m[1])
+                                else:
+                                    comments.append(m[0])
             r = Resident(row['姓名'], row['身份证'], row['电话'], ' '.join(comments))
             self._residents.setdefault(row['关联房屋地址'], []).append(r)
 
@@ -221,8 +224,10 @@ def main():
                         default=False, help='merge cells with the same address')
     parser.add_argument('--tag-regex', nargs='+',
                         help='tags to write as comments. A tag is a regex whose first group if any or the whole matched string will be written as the comment')
+    parser.add_argument('--exclude-tags', nargs='+',
+                        help='tags to exlude from the output')
     args = parser.parse_args()
-    Exporter(args.community_xlsx, args.output_directory, args.tag_regex).export(
+    Exporter(args.community_xlsx, args.output_directory, args.tag_regex, args.exclude_tags).export(
         args.merge_address)
 
 
