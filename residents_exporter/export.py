@@ -173,8 +173,6 @@ class Exporter:
     def _read_residents(self):
         for row in TableReader(self._db_wb['在住']):
             comments = []
-            if (row['年龄'] >= 90):
-                comments.append('90以上高龄')
             if row['社区标识']:
                 tags = set(row['社区标识'].split(','))
                 if self._exclude_tags.isdisjoint(tags):
