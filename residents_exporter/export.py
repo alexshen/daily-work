@@ -2,7 +2,6 @@
 
 import argparse
 import openpyxl
-from collections import namedtuple
 import functools
 import os
 import re
@@ -24,8 +23,12 @@ def copy_styles(ws, src_row, dest_row):
     ws.row_dimensions[dest_row].height = ws.row_dimensions[src_row].height
 
 
-Resident = namedtuple('Resident', 'name, id, phone, comment')
-
+class Resident:
+    def __init__(self, name='', id='', phone='', comment=''):
+        self.name = name
+        self.id = id
+        self.phone = phone
+        self.comment = comment
 
 class Room:
     def __init__(self, addr, tag=''):
@@ -43,11 +46,12 @@ class DocumentWriter:
     _COMMENT_COL = 6
     _ROOM_TAG = 7
 
-    def __init__(self, template, path, has_outline=True, has_room_tag=True):
+    def __init__(self, template, path, has_outline=True, has_room_tag=True, separate_room_tag=True):
         self._template = template
         self._has_outline = has_outline
         self._path = path
         self._has_room_tag = has_room_tag
+        self._separate_room_tag = separate_room_tag   
         self._unit_addr = None
         self._rooms = {}
 
@@ -95,7 +99,13 @@ class DocumentWriter:
             residents = room.residents if room.residents else [
                 Resident(name='', id='', phone='', comment='')]
             if self._has_room_tag:
-                ws.cell(row, self._ROOM_TAG).value = room.tag
+                if self._separate_room_tag:
+                    ws.cell(row, self._ROOM_TAG).value = room.tag
+                else:
+                    if residents[0].comment:
+                        residents[0].comment += ' ' + room.tag
+                    else:
+                        residents[0].comment = room.tag
             start_row = row
             for i, r in enumerate(residents):
                 ws.cell(row, self._IDX_COL).value = idx
@@ -156,10 +166,11 @@ class TableRow:
 
 
 class Exporter:
-    def __init__(self, template_path, data_xlsx, output_dir, has_outline=True, has_room_tag=True, comment_tags=[], exclude_tags=[]):
+    def __init__(self, template_path, data_xlsx, output_dir, has_outline=True, has_room_tag=True, separate_room_tag=True, comment_tags=[], exclude_tags=[]):
         self._template_path = template_path
         self._has_outline = has_outline
         self._has_room_tag = has_room_tag
+        self._separate_room_tag = separate_room_tag
         self._db_wb = openpyxl.load_workbook(data_xlsx)
         self._output_dir = output_dir
         self._residents = {}
@@ -208,7 +219,8 @@ class Exporter:
                                         os.path.join(
                                             self._output_dir, row['小区'], cur_unit_addr + '.xlsx'),
                                         has_outline=self._has_outline,
-                                        has_room_tag=self._has_room_tag)
+                                        has_room_tag=self._has_room_tag,
+                                        separate_room_tag=self._separate_room_tag)
                 writer.set_unit_addr(cur_unit_addr)
 
             writer.add_room(
@@ -238,10 +250,12 @@ def main():
     parser.add_argument('--simple-address', action='store_true', default=True)
     parser.add_argument('--no-room-tag', action='store_true', default=False)
     parser.add_argument('--no-outline', action='store_true', default=False)
+    parser.add_argument('--no-separate-room-tag', action='store_true', default=False, help='append the tag to the comment')
     args = parser.parse_args()
     Exporter(args.template_path, args.community_xlsx, args.output_directory, 
              has_outline=not args.no_outline, 
              has_room_tag=not args.no_room_tag,
+             separate_room_tag=not args.no_separate_room_tag,
              comment_tags=args.comment_tags, 
              exclude_tags=args.exclude_tags).export(args.simple_address, args.merge_address)
 
