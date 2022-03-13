@@ -44,9 +44,10 @@ class DocumentWriter:
     _ROOM_TAG = 7
     _TABLE_FIRST_ROW = 4
 
-    def __init__(self, template, path):
+    def __init__(self, template, path, has_room_tag=True):
         self._template = template
         self._path = path
+        self._has_room_tag = has_room_tag
         self._unit_addr = None
         self._rooms = {}
 
@@ -92,7 +93,8 @@ class DocumentWriter:
             # so that the room can be kept
             residents = room.residents if room.residents else [
                 Resident(name='', id='', phone='', comment='')]
-            ws.cell(row, self._ROOM_TAG).value = room.tag
+            if self._has_room_tag:
+                ws.cell(row, self._ROOM_TAG).value = room.tag
             start_row = row
             for i, r in enumerate(residents):
                 ws.cell(row, self._IDX_COL).value = idx
@@ -153,12 +155,13 @@ class TableRow:
 
 
 class Exporter:
-    def __init__(self, data_xlsx, output_dir, comment_tags=[], exclude_tags=[]):
+    def __init__(self, template_path, data_xlsx, output_dir, comment_tags=[], exclude_tags=[]):
+        self._template_path = template_path
         self._db_wb = openpyxl.load_workbook(data_xlsx)
         self._output_dir = output_dir
         self._residents = {}
         self._room_tags = {}
-        self._comment_tags = [ re.compile(pat) for pat in comment_tags ]
+        self._comment_tags = [re.compile(pat) for pat in comment_tags]
         self._exclude_tags = set(exclude_tags)
 
         self._read_residents()
@@ -189,8 +192,9 @@ class Exporter:
             if row['空关房']:
                 self._room_tags[row['简化地址']] = '空关房'
 
-    def export(self, merge_address=False):
+    def export(self, has_room_tag=True, simple_address=True, merge_address=False):
         tr_address = TableReader(self._db_wb['所有房屋地址'])
+        col_addr = ['详细地址', '简化地址'][simple_address and 1 or 0]
 
         last_unit_addr = None
         writer = None
@@ -199,14 +203,16 @@ class Exporter:
             if cur_unit_addr != last_unit_addr:
                 if writer:
                     writer.save(merge_address)
-                writer = DocumentWriter(os.path.join(
-                    os.path.dirname(__file__), 'template.xlsx'),
-                    os.path.join(self._output_dir, row['小区'], cur_unit_addr + '.xlsx'))
+                writer = DocumentWriter(self._template_path,
+                                        os.path.join(
+                                            self._output_dir, row['小区'], cur_unit_addr + '.xlsx'),
+                                        has_room_tag)
                 writer.set_unit_addr(cur_unit_addr)
 
-            writer.add_room(row['详细地址'], self._room_tags.get(row['简化地址'], ''))
+            writer.add_room(
+                row[col_addr], self._room_tags.get(row['简化地址'], ''))
             for r in self._residents.get(row['简化地址'], []):
-                writer.add_resident(row['详细地址'], r)
+                writer.add_resident(row[col_addr], r)
 
             last_unit_addr = cur_unit_addr
 
@@ -216,6 +222,7 @@ class Exporter:
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('template_path')
     parser.add_argument(
         'community_xlsx', help='path to the community data excel file')
     parser.add_argument('output_directory',
@@ -226,9 +233,11 @@ def main():
                         help='tags to write as comments. A tag is a regex whose first group if any or the whole matched string will be written as the comment')
     parser.add_argument('--exclude-tags', nargs='+',
                         help='tags to exlude from the output')
+    parser.add_argument('--simple-address', action='store_true', default=True)
+    parser.add_argument('--no-room-tag', action='store_true', default=False)
     args = parser.parse_args()
-    Exporter(args.community_xlsx, args.output_directory, args.comment_tags, args.exclude_tags).export(
-        args.merge_address)
+    Exporter(args.template_path, args.community_xlsx, args.output_directory, args.comment_tags, args.exclude_tags).export(
+        not args.no_room_tag, args.simple_address, args.merge_address)
 
 
 if __name__ == '__main__':
