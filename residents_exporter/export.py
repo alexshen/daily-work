@@ -105,7 +105,7 @@ class DocumentWriter:
                 ws.cell(row, self._ID_COL).value = r.id
                 ws.cell(row, self._PHONE_COL).value = r.phone
                 ws.cell(row, self._COMMENT_COL).value = r.comment
-                copy_styles(ws, first_row - 1, row)
+                copy_styles(ws, first_row, row)
                 row += 1
                 idx += 1
             if merge and len(residents) > 1:
