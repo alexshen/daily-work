@@ -153,12 +153,12 @@ class TableRow:
 
 
 class Exporter:
-    def __init__(self, data_xlsx, output_dir, tag_regexes=[], exclude_tags=[]):
+    def __init__(self, data_xlsx, output_dir, comment_tags=[], exclude_tags=[]):
         self._db_wb = openpyxl.load_workbook(data_xlsx)
         self._output_dir = output_dir
         self._residents = {}
         self._room_tags = {}
-        self._tag_regexes = [ re.compile(pat) for pat in tag_regexes ]
+        self._comment_tags = [ re.compile(pat) for pat in comment_tags ]
         self._exclude_tags = set(exclude_tags)
 
         self._read_residents()
@@ -172,9 +172,9 @@ class Exporter:
             if row['社区标识']:
                 tags = set(row['社区标识'].split(','))
                 if not self._exclude_tags.isdisjoint(tags):
-                    for regex in self._tag_regexes:
+                    for comment_tag in self._comment_tags:
                         for tag in tags:
-                            for m in regex.finditer(tag):
+                            for m in comment_tag.finditer(tag):
                                 if len(m.groups()) > 0:
                                     comments.append(m[1])
                                 else:
@@ -222,12 +222,12 @@ def main():
                         help='path to the output directory')
     parser.add_argument('--merge-address', action='store_true',
                         default=False, help='merge cells with the same address')
-    parser.add_argument('--tag-regex', nargs='+',
+    parser.add_argument('--comment-tags', nargs='+',
                         help='tags to write as comments. A tag is a regex whose first group if any or the whole matched string will be written as the comment')
     parser.add_argument('--exclude-tags', nargs='+',
                         help='tags to exlude from the output')
     args = parser.parse_args()
-    Exporter(args.community_xlsx, args.output_directory, args.tag_regex, args.exclude_tags).export(
+    Exporter(args.community_xlsx, args.output_directory, args.comment_tags, args.exclude_tags).export(
         args.merge_address)
 
 
