@@ -27,9 +27,9 @@ Resident = namedtuple('Resident', 'name, id, phone')
 
 
 class Room:
-    def __init__(self, addr, comment=''):
+    def __init__(self, addr, tag=''):
         self.addr = addr
-        self.comment = comment
+        self.tag = tag
         self.residents = []
 
 
@@ -40,6 +40,7 @@ class DocumentWriter:
     _ID_COL = 4
     _PHONE_COL = 5
     _COMMENT_COL = 6
+    _ROOM_TAG = 7
     _TABLE_FIRST_ROW = 4
 
     def __init__(self, template, path):
@@ -51,10 +52,10 @@ class DocumentWriter:
     def set_unit_addr(self, unit_addr):
         self._unit_addr = unit_addr
 
-    def add_room(self, addr, comment=''):
+    def add_room(self, addr, tag=''):
         if addr in self._rooms:
             raise ValueError('duplicate room {0}'.format(addr))
-        self._rooms[addr] = Room(addr, comment)
+        self._rooms[addr] = Room(addr, tag)
 
     def add_resident(self, addr, resident):
         try:
@@ -90,7 +91,7 @@ class DocumentWriter:
             # so that the room can be kept 
             residents = room.residents if room.residents else [
                 Resident(name='', id='', phone='')]
-            ws.cell(row, self._COMMENT_COL).value = room.comment
+            ws.cell(row, self._ROOM_TAG).value = room.tag
             start_row = row
             for i, r in enumerate(residents):
                 ws.cell(row, self._IDX_COL).value = idx
@@ -168,6 +169,9 @@ class Exporter:
         for row in TableReader(self._db_wb['房屋标签']):
             if row['出租房']:
                 self._room_tags[row['简化地址']] = '出租房'
+            if row['空关房']:
+                self._room_tags[row['简化地址']] = '空关房'
+
 
     def export(self, merge_address=False):
         tr_address = TableReader(self._db_wb['所有房屋地址'])
