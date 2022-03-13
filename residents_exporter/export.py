@@ -177,7 +177,7 @@ class Exporter:
                 comments.append('90以上高龄')
             if row['社区标识']:
                 tags = set(row['社区标识'].split(','))
-                if not self._exclude_tags.isdisjoint(tags):
+                if self._exclude_tags.isdisjoint(tags):
                     for comment_tag in self._comment_tags:
                         for tag in tags:
                             for m in comment_tag.finditer(tag):
