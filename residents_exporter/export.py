@@ -42,10 +42,10 @@ class DocumentWriter:
     _PHONE_COL = 5
     _COMMENT_COL = 6
     _ROOM_TAG = 7
-    _TABLE_FIRST_ROW = 4
 
-    def __init__(self, template, path, has_room_tag=True):
+    def __init__(self, template, path, has_outline=True, has_room_tag=True):
         self._template = template
+        self._has_outline = has_outline
         self._path = path
         self._has_room_tag = has_room_tag
         self._unit_addr = None
@@ -87,7 +87,8 @@ class DocumentWriter:
             unit_addr=self._unit_addr, num_rooms=self.num_rooms, num_residents=self.num_residents)
 
         idx = 1
-        row = self._TABLE_FIRST_ROW
+        first_row = self._has_outline and 4 or 3
+        row = first_row
         for room in self._rooms.values():
             # get all the residents, if there's no resident, we need to add a placeholder resident
             # so that the room can be kept
@@ -104,7 +105,7 @@ class DocumentWriter:
                 ws.cell(row, self._ID_COL).value = r.id
                 ws.cell(row, self._PHONE_COL).value = r.phone
                 ws.cell(row, self._COMMENT_COL).value = r.comment
-                copy_styles(ws, self._TABLE_FIRST_ROW - 1, row)
+                copy_styles(ws, first_row - 1, row)
                 row += 1
                 idx += 1
             if merge and len(residents) > 1:
@@ -155,8 +156,10 @@ class TableRow:
 
 
 class Exporter:
-    def __init__(self, template_path, data_xlsx, output_dir, comment_tags=[], exclude_tags=[]):
+    def __init__(self, template_path, data_xlsx, output_dir, has_outline=True, has_room_tag=True, comment_tags=[], exclude_tags=[]):
         self._template_path = template_path
+        self._has_outline = has_outline
+        self._has_room_tag = has_room_tag
         self._db_wb = openpyxl.load_workbook(data_xlsx)
         self._output_dir = output_dir
         self._residents = {}
@@ -192,7 +195,7 @@ class Exporter:
             if row['空关房']:
                 self._room_tags[row['简化地址']] = '空关房'
 
-    def export(self, has_room_tag=True, simple_address=True, merge_address=False):
+    def export(self, simple_address=True, merge_address=False):
         tr_address = TableReader(self._db_wb['所有房屋地址'])
         col_addr = ['详细地址', '简化地址'][simple_address and 1 or 0]
 
@@ -206,7 +209,8 @@ class Exporter:
                 writer = DocumentWriter(self._template_path,
                                         os.path.join(
                                             self._output_dir, row['小区'], cur_unit_addr + '.xlsx'),
-                                        has_room_tag)
+                                        has_outline=self._has_outline,
+                                        has_room_tag=self._has_room_tag)
                 writer.set_unit_addr(cur_unit_addr)
 
             writer.add_room(
@@ -235,9 +239,13 @@ def main():
                         help='tags to exlude from the output')
     parser.add_argument('--simple-address', action='store_true', default=True)
     parser.add_argument('--no-room-tag', action='store_true', default=False)
+    parser.add_argument('--no-outline', action='store_true', default=False)
     args = parser.parse_args()
-    Exporter(args.template_path, args.community_xlsx, args.output_directory, args.comment_tags, args.exclude_tags).export(
-        not args.no_room_tag, args.simple_address, args.merge_address)
+    Exporter(args.template_path, args.community_xlsx, args.output_directory, 
+             has_outline=not args.no_outline, 
+             has_room_tag=not args.no_room_tag,
+             comment_tags=args.comment_tags, 
+             exclude_tags=args.exclude_tags).export(args.simple_address, args.merge_address)
 
 
 if __name__ == '__main__':
