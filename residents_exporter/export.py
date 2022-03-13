@@ -86,13 +86,16 @@ class DocumentWriter:
         idx = 1
         row = self._TABLE_FIRST_ROW
         for room in self._rooms.values():
+            # get all the residents, if there's no resident, we need to add a placeholder resident
+            # so that the room can be kept 
             residents = room.residents if room.residents else [
                 Resident(name='', id='', phone='')]
             ws.cell(row, self._COMMENT_COL).value = room.comment
             start_row = row
-            for r in residents:
+            for i, r in enumerate(residents):
                 ws.cell(row, self._IDX_COL).value = idx
-                ws.cell(row, self._ROOM_COL).value = room.addr
+                if i == 0:
+                    ws.cell(row, self._ROOM_COL).value = room.addr
                 ws.cell(row, self._NAME_COL).value = r.name
                 ws.cell(row, self._ID_COL).value = r.id
                 ws.cell(row, self._PHONE_COL).value = r.phone
@@ -166,7 +169,7 @@ class Exporter:
             if row['出租房']:
                 self._room_tags[row['简化地址']] = '出租房'
 
-    def export(self):
+    def export(self, merge_address=False):
         tr_address = TableReader(self._db_wb['所有房屋地址'])
 
         last_unit_addr = None
@@ -175,7 +178,7 @@ class Exporter:
             cur_unit_addr = row['单元地址']
             if cur_unit_addr != last_unit_addr:
                 if writer:
-                    writer.save(True)
+                    writer.save(merge_address)
                 writer = DocumentWriter(os.path.join(
                     os.path.dirname(__file__), 'template.xlsx'),
                     os.path.join(self._output_dir, row['小区'], cur_unit_addr + '.xlsx'))
@@ -188,7 +191,7 @@ class Exporter:
             last_unit_addr = cur_unit_addr
 
         if writer:
-            writer.save(True)
+            writer.save(merge_address)
 
 
 def main():
@@ -197,8 +200,9 @@ def main():
         'community_xlsx', help='path to the community data excel file')
     parser.add_argument('output_directory',
                         help='path to the output directory')
+    parser.add_argument('--merge-address', action='store_true', default=False, help='merge cells with the same address')
     args = parser.parse_args()
-    Exporter(args.community_xlsx, args.output_directory).export()
+    Exporter(args.community_xlsx, args.output_directory).export(args.merge_address)
 
 
 if __name__ == '__main__':
