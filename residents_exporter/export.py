@@ -5,6 +5,7 @@ import openpyxl
 from collections import namedtuple
 import functools
 import os
+import re
 from copy import copy
 
 
@@ -23,7 +24,7 @@ def copy_styles(ws, src_row, dest_row):
     ws.row_dimensions[dest_row].height = ws.row_dimensions[src_row].height
 
 
-Resident = namedtuple('Resident', 'name, id, phone')
+Resident = namedtuple('Resident', 'name, id, phone, comment')
 
 
 class Room:
@@ -88,9 +89,9 @@ class DocumentWriter:
         row = self._TABLE_FIRST_ROW
         for room in self._rooms.values():
             # get all the residents, if there's no resident, we need to add a placeholder resident
-            # so that the room can be kept 
+            # so that the room can be kept
             residents = room.residents if room.residents else [
-                Resident(name='', id='', phone='')]
+                Resident(name='', id='', phone='', comment='')]
             ws.cell(row, self._ROOM_TAG).value = room.tag
             start_row = row
             for i, r in enumerate(residents):
@@ -100,6 +101,7 @@ class DocumentWriter:
                 ws.cell(row, self._NAME_COL).value = r.name
                 ws.cell(row, self._ID_COL).value = r.id
                 ws.cell(row, self._PHONE_COL).value = r.phone
+                ws.cell(row, self._COMMENT_COL).value = r.comment
                 copy_styles(ws, self._TABLE_FIRST_ROW - 1, row)
                 row += 1
                 idx += 1
@@ -151,18 +153,30 @@ class TableRow:
 
 
 class Exporter:
-    def __init__(self, data_xlsx, output_dir):
+    def __init__(self, data_xlsx, output_dir, tag_regexes=[]):
         self._db_wb = openpyxl.load_workbook(data_xlsx)
         self._output_dir = output_dir
         self._residents = {}
         self._room_tags = {}
+        self._tag_regexes = [ re.compile(pat) for pat in tag_regexes ]
 
         self._read_residents()
         self._read_room_tags()
 
     def _read_residents(self):
         for row in TableReader(self._db_wb['在住']):
-            r = Resident(row['姓名'], row['身份证'], row['电话'])
+            comments = []
+            if (row['年龄'] >= 90):
+                comments.append('90以上高龄')
+            if row['社区标识']:
+                for regex in self._tag_regexes:
+                    for tag in row['社区标识'].split(','):
+                        for m in regex.finditer(tag):
+                            if len(m.groups()) > 0:
+                                comments.append(m[1])
+                            else:
+                                comments.append(m[0])
+            r = Resident(row['姓名'], row['身份证'], row['电话'], ' '.join(comments))
             self._residents.setdefault(row['关联房屋地址'], []).append(r)
 
     def _read_room_tags(self):
@@ -171,7 +185,6 @@ class Exporter:
                 self._room_tags[row['简化地址']] = '出租房'
             if row['空关房']:
                 self._room_tags[row['简化地址']] = '空关房'
-
 
     def export(self, merge_address=False):
         tr_address = TableReader(self._db_wb['所有房屋地址'])
@@ -204,9 +217,13 @@ def main():
         'community_xlsx', help='path to the community data excel file')
     parser.add_argument('output_directory',
                         help='path to the output directory')
-    parser.add_argument('--merge-address', action='store_true', default=False, help='merge cells with the same address')
+    parser.add_argument('--merge-address', action='store_true',
+                        default=False, help='merge cells with the same address')
+    parser.add_argument('--tag-regex', nargs='+',
+                        help='tags to write as comments. A tag is a regex whose first group if any or the whole matched string will be written as the comment')
     args = parser.parse_args()
-    Exporter(args.community_xlsx, args.output_directory).export(args.merge_address)
+    Exporter(args.community_xlsx, args.output_directory, args.tag_regex).export(
+        args.merge_address)
 
 
 if __name__ == '__main__':
