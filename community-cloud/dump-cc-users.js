@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump CC Users
 // @namespace    http://tampermonkey.net/
-// @version      0.11
+// @version      0.12
 // @description  Dump currently listed cc users
 // @author       ashen
 // @match        https://sqy.mzj.sh.gov.cn/person/PersonInfoList
@@ -125,6 +125,9 @@
                     for (let flag of JSON.parse(record.personOrgsPositions)) {
                         flags.push(flag.tagName);
                     }
+                }
+                for (let tag of record.tagInfo) {
+                    flags.push(tag.tagName);
                 }
                 fields.push(flags.join(','))
                 users.push(fields.join('\t'));
