@@ -78,7 +78,7 @@ class DocumentWriter:
     def num_rooms(self):
         return len(self._rooms)
 
-    def save(self, merge=False):
+    def save(self, merge=False, first_resident_address_only=True):
         tmpl = openpyxl.load_workbook(self._template)
         ws = tmpl.active
         # update title
@@ -109,7 +109,7 @@ class DocumentWriter:
             start_row = row
             for i, r in enumerate(residents):
                 ws.cell(row, self._IDX_COL).value = idx
-                if i == 0:
+                if i == 0 or not first_resident_address_only:
                     ws.cell(row, self._ROOM_COL).value = room.addr
                 ws.cell(row, self._NAME_COL).value = r.name
                 ws.cell(row, self._ID_COL).value = r.id
@@ -166,7 +166,8 @@ class TableRow:
 
 
 class Exporter:
-    def __init__(self, template_path, data_xlsx, output_dir, has_outline=True, has_room_tag=True, separate_room_tag=True, comment_tags=[], exclude_tags=[]):
+    def __init__(self, template_path, data_xlsx, output_dir, 
+                 has_outline=True, has_room_tag=True, separate_room_tag=True, comment_tags=[], exclude_tags=[]):
         self._template_path = template_path
         self._has_outline = has_outline
         self._has_room_tag = has_room_tag
@@ -175,8 +176,8 @@ class Exporter:
         self._output_dir = output_dir
         self._residents = {}
         self._room_tags = {}
-        self._comment_tags = [re.compile(pat) for pat in comment_tags]
-        self._exclude_tags = set(exclude_tags)
+        self._comment_tags = [re.compile(pat) for pat in (comment_tags or [])]
+        self._exclude_tags = set(exclude_tags or [])
 
         self._read_residents()
         self._read_room_tags()
@@ -204,7 +205,7 @@ class Exporter:
             if row['空关房']:
                 self._room_tags[row['简化地址']] = '空关房'
 
-    def export(self, simple_address=True, merge_address=False):
+    def export(self, simple_address=True, merge_address=False, first_resident_address_only=True):
         tr_address = TableReader(self._db_wb['所有房屋地址'])
         col_addr = ['详细地址', '简化地址'][simple_address and 1 or 0]
 
@@ -231,7 +232,7 @@ class Exporter:
             last_unit_addr = cur_unit_addr
 
         if writer:
-            writer.save(merge_address)
+            writer.save(merge_address, first_resident_address_only)
 
 
 def main():
@@ -251,13 +252,14 @@ def main():
     parser.add_argument('--no-room-tag', action='store_true', default=False)
     parser.add_argument('--no-outline', action='store_true', default=False)
     parser.add_argument('--no-separate-room-tag', action='store_true', default=False, help='append the tag to the comment')
+    parser.add_argument('--first-resident-address-only', action='store_true', default=False)
     args = parser.parse_args()
     Exporter(args.template_path, args.community_xlsx, args.output_directory, 
              has_outline=not args.no_outline, 
              has_room_tag=not args.no_room_tag,
              separate_room_tag=not args.no_separate_room_tag,
              comment_tags=args.comment_tags, 
-             exclude_tags=args.exclude_tags).export(args.simple_address, args.merge_address)
+             exclude_tags=args.exclude_tags).export(args.simple_address, args.merge_address, args.first_resident_address_only)
 
 
 if __name__ == '__main__':
