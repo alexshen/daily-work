@@ -10,6 +10,12 @@ import getpass
 import sys
 
 
+def prompt_username():
+    username = ''
+    while not username:
+        username = input('Username: ').strip()
+    return username
+
 def prompt_password():
     password = ''
     while not password:
@@ -42,10 +48,9 @@ it's the first time to login, you will be prompted to enter the username''')
     sess_cfg = app.SessionConfig(os.path.join(
         os.path.expanduser('~'), '.ccsession'))
 
-    password = ''
     username = args.username or sess_cfg.last_login_username
     if not username:
-        die('Please specify the username')
+        username = prompt_username()
 
     appcfg = cloud.AppConfig(os.path.join(dirname, 'config.ini'))
     session = cloud.Session(appcfg['app.api_endpoint'],
@@ -56,13 +61,9 @@ it's the first time to login, you will be prompted to enter the username''')
     sess_data = sess_cfg.get_session_data(username)
     if sess_data:
         session.load(bytes(sess_data, encoding='utf-8'))
-        password = session.password
 
-    if not password or args.password:
-        session.password = password = prompt_password()
-
-    if not session.username:
-        session.username = username
+    if args.password:
+        session.password = prompt_password()
 
     if not session.validate():
         session.login()
