@@ -107,7 +107,8 @@ class DocumentWriter:
                     else:
                         residents[0].comment = room.tag
             start_row = row
-            for i, r in enumerate(residents):
+            # output residents ordered by name in ascending order
+            for i, r in enumerate(sorted(residents, key=lambda x: x.name)):
                 ws.cell(row, self._IDX_COL).value = idx
                 if i == 0 or not first_resident_address_only:
                     ws.cell(row, self._ROOM_COL).value = room.addr
