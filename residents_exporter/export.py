@@ -114,7 +114,10 @@ class DocumentWriter:
                 ws.cell(row, self._NAME_COL).value = r.name
                 ws.cell(row, self._ID_COL).value = r.id
                 ws.cell(row, self._PHONE_COL).value = r.phone
-                ws.cell(row, self._COMMENT_COL).value = r.comment
+                comment = r.comment
+                if i == 0 and self._has_room_tag and not self._separate_room_tag:
+                    comment += (r.comment and ' ' or '') + room.tag
+                ws.cell(row, self._COMMENT_COL).value = comment
                 copy_styles(ws, first_row, row)
                 row += 1
                 idx += 1
