@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Member List Functions
 // @author  ashen
-// @version 0.1
+// @version 0.2
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
@@ -24,7 +24,7 @@ async function postJson(urlOrString, json) {
 }
 
 const HEADERS = [
-    '社区', '楼号', '房间号', '姓名', '身份证', '电话' 
+    '社区', '楼号', '房间号', '姓名', '身份证', '电话', '审核时间'
 ];
 
 async function getMemberInfo(mid) {
@@ -62,7 +62,11 @@ async function getMembers(start, end, cid) {
     if (!resp.success) {
         throw new Error();
     }
-    return await Promise.all(resp.responseText.map(e => getMemberInfo(e.MemberID)));
+    return await Promise.all(resp.responseText.map(e => {
+        const member = getMemberInfo(e.MemberID);
+        member.push(e.AuthDateTime);
+        return member;
+    }));
 }
 
 async function getAllMembers(cid) {
