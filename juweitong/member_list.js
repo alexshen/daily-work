@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Member List Functions
 // @author  ashen
-// @version 0.2
+// @version 0.3
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
@@ -62,8 +62,8 @@ async function getMembers(start, end, cid) {
     if (!resp.success) {
         throw new Error();
     }
-    return await Promise.all(resp.responseText.map(e => {
-        const member = getMemberInfo(e.MemberID);
+    return await Promise.all(resp.responseText.map(async e => {
+        const member = await getMemberInfo(e.MemberID);
         member.push(e.AuthDateTime);
         return member;
     }));
