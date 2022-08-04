@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.4
+// @version 0.5
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
@@ -122,14 +122,20 @@ async function getCredits(year, month) {
 }
 
 async function dumpCreditsBetweenMonths(year, from, to) {
-    const requests = [];
+    from = from || 1;
     to = to || from;
-    for (let i = from; i <= to; ++i) {
-        requests.push(getCredits(year, i));
+    if (from < 1 || from > 12 ||
+        to < 1 || to > 12) {
+        throw new Error("Invalid month range");
     }
-    const result = (await Promise.all(requests)).flatMap(e => e.map(e => e.join('\t')));
-    result.unshift(CREDIT_HEADERS.join('\t'));
-    console.log(result.join('\n'));
+
+    const records = [];
+    for (let i = from; i <= to; ++i) {
+        records.push(...await getCredits(year, i));
+        await cc.delay(500);
+    }
+    records.unshift(CREDIT_HEADERS);
+    console.log(records.map(e => e.join('\t')).join('\n'));
 }
 
 window.addEventListener('load', () => {
@@ -138,13 +144,17 @@ window.addEventListener('load', () => {
         dumpAllMembers(cid);
     });
     GM_registerMenuCommand("Dump Credits", () => {
-        const [year, from, to] = prompt('Specify the months to dump credits, e.g. 2022 1 3 to dump the credits from Jan to Mar in 2022')
+        const [year, from, to] = prompt('Specify the date range to dump credits, year [from [to]]')
                                 .split(' ')
                                 .map(e => parseInt(e, 10));
-        if (year === undefined || isNaN(year) ||
-            from === undefined || isNaN(from) ||
-            (to !== undefined && isNaN(to))) {
-            throw new Error("Invalid months");
+        if (year === undefined || isNaN(year)) {
+            throw new Error('Invalid year');
+        }
+        if (from !== undefined && isNaN(from)) {
+            throw new Error('Invalid starting month');
+        }
+        if (to !== undefined && isNaN(to)) {
+            throw new Error("Invalid ending month");
         }
         dumpCreditsBetweenMonths(year, from, to);
     });
