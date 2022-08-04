@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.5
+// @version 0.6
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
@@ -122,8 +122,8 @@ async function getCredits(year, month) {
 }
 
 async function dumpCreditsBetweenMonths(year, from, to) {
+    to = to || from || 12;
     from = from || 1;
-    to = to || from;
     if (from < 1 || from > 12 ||
         to < 1 || to > 12) {
         throw new Error("Invalid month range");
