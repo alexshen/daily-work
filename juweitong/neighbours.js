@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.8
+// @version 0.9
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
@@ -25,7 +25,7 @@ async function postJson(urlOrString, json) {
 }
 
 const MEMBER_HEADERS = [
-    '社区', '楼号', '房间号', '姓名', 'UUID', '身份证', '电话', '审核时间'
+    '社区', '楼号', '房间号', '姓名', 'UUID', '身份证', '电话', '审核时间', '用户状态'
 ];
 
 async function getMemberInfo(mid) {
@@ -41,7 +41,8 @@ async function getMemberInfo(mid) {
         getMemberAttribute('MemberName'),
         mid,
         getMemberAttribute('IDNoText'),
-        getMemberAttribute('MobileNoText')
+        getMemberAttribute('MobileNoText'),
+        getStatusText()
     ];
 
     function getCommunityName() {
@@ -51,6 +52,11 @@ async function getMemberInfo(mid) {
 
     function getMemberAttribute(name) {
         return doc.querySelector(`input[name=${name}]`).value;
+    }
+
+    function getStatusText() {
+        const e = doc.querySelector('div.container > div:nth-child(8) > div > div:nth-child(4) > span');
+        return e.innerText;
     }
 }
 
