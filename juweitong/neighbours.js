@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.7
+// @version 0.8
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
@@ -142,17 +142,13 @@ async function dumpCreditsBetweenMonths(year, from, to) {
 async function activateMember(uuid) {
     const url = new URL('/neighbour/common/member_auth_reuse', document.location.origin);
     const resp = await get(url, { member: uuid }, null, 'json');
-    if (!resp.success) {
-        throw new Error('Failed to activate ' + uuid);
-    }
+    return resp.success;
 }
 
 async function deactivateMember(uuid) {
     const url = new URL('/neighbour/common/member_auth_stop', document.location.origin);
     const resp = await get(url, { member: uuid }, null, 'json');
-    if (!resp.success) {
-        throw new Error('Failed to activate ' + uuid);
-    }
+    return resp.success;
 }
 
 window.addEventListener('load', () => {
@@ -181,8 +177,11 @@ window.addEventListener('load', () => {
             return;
         }
         for (let r of await cc.readRecords(fname)) {
-            await deactivateMember(r.uuid);
-            console.log(`deactivated ${r.uuid}`);
+            if (await deactivateMember(r.uuid)) {
+                console.log(`deactivated ${r.uuid}`);
+            } else {
+                console.log(`failed to deactivate ${r.uuid}`);
+            }
         }
     });
 });
