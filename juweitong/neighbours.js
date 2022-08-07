@@ -3,13 +3,14 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.6
+// @version 0.7
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
+// @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/utils.js
 // ==/UserScript==
 
-/* global cc, GM_registerMenuCommand */
+/* global cc, ccu, GM_registerMenuCommand */
 
 async function get(urlOrString, params, headers, respType) {
     headers = headers || {};
@@ -138,6 +139,22 @@ async function dumpCreditsBetweenMonths(year, from, to) {
     console.log(records.map(e => e.join('\t')).join('\n'));
 }
 
+async function activateMember(uuid) {
+    const url = new URL('/neighbour/common/member_auth_reuse', document.location.origin);
+    const resp = await get(url, { member: uuid }, null, 'json');
+    if (!resp.success) {
+        throw new Error('Failed to activate ' + uuid);
+    }
+}
+
+async function deactivateMember(uuid) {
+    const url = new URL('/neighbour/common/member_auth_stop', document.location.origin);
+    const resp = await get(url, { member: uuid }, null, 'json');
+    if (!resp.success) {
+        throw new Error('Failed to activate ' + uuid);
+    }
+}
+
 window.addEventListener('load', () => {
     GM_registerMenuCommand("Dump Members", () => {
         const cid = /cid=(.+)/.exec(document.URL)[1];
@@ -157,5 +174,15 @@ window.addEventListener('load', () => {
             throw new Error("Invalid ending month");
         }
         dumpCreditsBetweenMonths(year, from, to);
+    });
+    GM_registerMenuCommand("Deactivate Members", async () => {
+        const fname = await ccu.selectFile();
+        if (!fname) {
+            return;
+        }
+        for (let r of await cc.readRecords(fname)) {
+            await deactivateMember(r.uuid);
+            console.log(`deactivated ${r.uuid}`);
+        }
     });
 });
