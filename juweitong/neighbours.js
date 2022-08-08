@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.9
+// @version 0.10
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
@@ -25,7 +25,7 @@ async function postJson(urlOrString, json) {
 }
 
 const MEMBER_HEADERS = [
-    '社区', '楼号', '房间号', '姓名', 'UUID', '身份证', '电话', '审核时间', '用户状态'
+    '社区', '楼号', '房间号', '姓名', 'UUID', '身份证', '电话', '用户状态', '审核时间'
 ];
 
 async function getMemberInfo(mid) {
