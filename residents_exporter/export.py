@@ -101,11 +101,6 @@ class DocumentWriter:
             if self._has_room_tag:
                 if self._separate_room_tag:
                     ws.cell(row, self._ROOM_TAG).value = room.tag
-                else:
-                    if residents[0].comment:
-                        residents[0].comment += ' ' + room.tag
-                    else:
-                        residents[0].comment = room.tag
             start_row = row
             # output residents ordered by name in ascending order
             for i, r in enumerate(sorted(residents, key=lambda x: x.name)):
