@@ -120,9 +120,6 @@ class DocumentWriter:
             if merge and len(residents) > 1:
                 ws.merge_cells(start_row=start_row, start_column=self._ROOM_COL,
                                end_row=start_row + len(residents) - 1, end_column=self._ROOM_COL)
-            if merge:
-                ws.merge_cells(start_row=start_row, start_column=self._COMMENT_COL,
-                               end_row=start_row + len(residents) - 1, end_column=self._COMMENT_COL)
 
         os.makedirs(os.path.dirname(self._path), exist_ok=True)
         tmpl.save(self._path)
