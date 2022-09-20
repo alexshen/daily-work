@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dump Volunteers
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Dump volunteers
 // @author       ashen
 // @match        https://sh.zhiyuanyun.com/app/org/member.php*
@@ -20,14 +20,6 @@
         window.document.location
     );
 
-    const HEADERS = {
-        '用户名': 1,
-        '姓名': 2,
-        '最后登录': 3,
-        '注册日期': 4,
-        '志愿者编号': 5,
-        '手机/电话': 10
-    };
     async function getVolunteers(pageNo) {
         let doc;
         if (pageNo) {
@@ -54,12 +46,31 @@
         return volunteers;
     }
 
+    const FIRST_FIELD_IDX = 1;
+    const HEADERS = [
+        "用户名",
+        "姓名",
+        "最后登录",
+        "注册日期",
+        "志愿者编号",
+        "电子邮箱",
+        "政治面貌",
+        "民族",
+        "国籍",
+        "手机/电话",
+        "区域",
+        "详细地址"
+    ];
     async function getVolunteer(href) {
         const resp = await cc.doRequest(new URL(href, window.document.location), 'GET');
         const doc = new DOMParser().parseFromString(resp, 'text/html');
         const rows = doc.querySelectorAll('table.table1 tr');
         if (rows.length) {
-            return Object.values(HEADERS).map(idx => rows[idx].lastElementChild.innerText.trim());
+            const values = [];
+            for (let i = FIRST_FIELD_IDX; i < FIRST_FIELD_IDX + HEADERS.length; ++i) {
+                values.push(rows[i].lastElementChild.innerText.trim());
+            }
+            return values;
         }
         return null;
     }
@@ -67,7 +78,7 @@
     async function dumpVolunteers(first, numPages) {
         first = first || 1;
         numPages = numPages || 0;
-        const records = [Object.keys(HEADERS)];
+        const records = [HEADERS];
         for (let i = first; ; ++i) {
             console.log(`dump page ${i}`);
             const vols = await getVolunteers(i)
@@ -86,7 +97,7 @@
     }
 
     async function dumpVolunteersOnCurrentPage() {
-        const records = [Object.keys(HEADERS)];
+        const records = [HEADERS];
         records.push(...await getVolunteers());
         console.log(records.map(e => e.join('\t')).join('\n'));
     }
