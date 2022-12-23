@@ -252,6 +252,7 @@ window.cc = (function() {
     return {
         delay: delay,
         XHRInterceptor: XHRInterceptor,
+        XHRInterceptorUtils: XHRInterceptorUtils,
         RequestWaiter: RequestWaiter,
         waitUntilRequestDone: waitUntilRequestDone,
         readFile: readFile,
