@@ -75,7 +75,7 @@ window.cc = (function() {
         static use(filter, handler) {
             let pred = null;
             if (typeof filter === 'string') {
-                pred = request => request.pathname === filter;
+                pred = request => new URL(request.responseURL).pathname === filter;
             } else if (filter instanceof RegExp) {
                 pred = request => filter.test(request.href)
             } else if (typeof filter === 'function') {
