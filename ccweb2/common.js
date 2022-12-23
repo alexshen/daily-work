@@ -53,6 +53,40 @@ window.cc = (function() {
         }
     }
 
+    class XHRInterceptorUtils {
+        static _s_init = (function() {
+            XHRInterceptor.addEventListener('load', XHRInterceptorUtils._onLoaded.bind(XHRInterceptorUtils));
+        })();
+
+        static _s_handlers = [];
+
+        static _onLoaded(evt) {
+            this._s_handlers.forEach(e => {
+                try {
+                    if (e.pred(evt.target)) {
+                        e.handler(evt.target);
+                    }
+                } catch (ex) {
+                    console.error(ex);
+                }
+            });
+        }
+
+        static use(filter, handler) {
+            let pred = null;
+            if (typeof filter === 'string') {
+                pred = request => request.pathname === filter;
+            } else if (filter instanceof RegExp) {
+                pred = request => filter.test(request.href)
+            } else if (typeof filter === 'function') {
+                pred = request => filter(request)
+            } else {
+                throw new Error('invalid filter');
+            }
+            this._s_handlers.push({ pred: pred, handler: handler});
+        }
+    }
+
     class RequestWaiter {
         /**
          * @param predicate returns true indicating the waiting should end
