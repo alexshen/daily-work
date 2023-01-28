@@ -61,17 +61,25 @@ window.cc = (function() {
         static _s_handlers = [];
 
         static _onLoaded(evt) {
-            this._s_handlers.forEach(e => {
+            let outIndex = 0;
+            for (let i = 0; i < this._s_handlers.length; ++i) {
+                const e = this._s_handlers[i];
                 try {
-                    if (e.pred(evt.target)) {
-                        e.handler(evt.target);
+                    if (!e.pred(evt.target) || !e.handler(evt.target)) {
+                        this._s_handlers[outIndex++] = this._s_handlers[i];
                     }
                 } catch (ex) {
                     console.error(ex);
                 }
-            });
+            }
+            this._s_handlers.splice(outIndex, this._s_handlers.length - outIndex);
         }
 
+        /**
+         * 
+         * @param {String, Regex, Function} filter A predicate indicating if the handler needs to run
+         * @param {*} handler Returns true if the handler needs to be removed
+         */
         static use(filter, handler) {
             let pred = null;
             if (typeof filter === 'string') {
