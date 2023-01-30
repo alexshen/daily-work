@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.1
+// @version      0.2
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -62,14 +62,6 @@
         return true;
     }
 
-    function randomString(s, len) {
-        let res = '';
-        while (len--) {
-            res += s[Math.random() * s.length | 0];
-        }
-        return res;
-    }
-
     const AES_KEY_SEED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     function aesDecrypt(key, iv, data) {
@@ -87,8 +79,8 @@
 
         const enc = new JSEncrypt();
         enc.setPublicKey(g_state.rsaPublicKey);
-        const key = randomString(AES_KEY_SEED, 16)
-        const iv = randomString(AES_KEY_SEED, 16);
+        const key = cc.randomString(AES_KEY_SEED, 16)
+        const iv = cc.randomString(AES_KEY_SEED, 16);
         headers['AES-KEY'] = enc.encrypt(key);
         headers['AES-IV'] = enc.encrypt(iv);
         headers['Authorization'] = Cookie.getItem('SQY-ADMIN-TOKEN');
@@ -118,64 +110,9 @@
         }));
     }
 
-    class CSVRecordConverter {
-        /**
-         * 
-         * @param {Object[]} headerDescriptors 
-         * @param {string} headerDescriptors[].name - name of the header
-         * @param {string} headerDescriptors[].key - key name of the header value in a source object
-         * @param {string} headerDescriptors[].default - the default value if the key does not exist
-         */
-        constructor(headerDescriptors) {
-            this._headerDescriptors = headerDescriptors;
-        }
-
-        get headers() {
-            return _.map(this._headerDescriptors, e => e.name);
-        }
-
-        convertToArray(o) {
-            return _.map(this._headerDescriptors, e => _.get(o, e.key, e.default));
-        }
-    }
-
-    /**
-     * divide an array into a array of sub-arrays
-     * @param {Object[]} array - array to be sliced
-     * @param {number} sliceSize 
-     * @returns 
-     */
-    function divide(array, sliceSize) {
-        if (sliceSize <= 0) throw new Error(sliceSize);
-
-        const res = [];
-        for (let i = 0; i < array.length; i += sliceSize) {
-            res.push(array.slice(i, Math.min(i + sliceSize, array.length)));
-        }
-        return res;
-    }
-
-    /**
-     * divide the array and run each slice one by one
-     * @param {Object[]} array 
-     * @param {function} map 
-     * @param {number} sliceSize 
-     * @param {function} completeOfSlice 
-     */
-    async function slicedMap(array, map, sliceSize, completeOfSlice) {
-        const results = [];
-        for (let slice of divide(array, sliceSize)) {
-            results.push(...await Promise.all(slice.map(map)));
-            if (completeOfSlice) {
-                await completeOfSlice();
-            }
-        }
-        return results;
-    }
-
     async function dumpResidents() {
         const deptId = Cookie.getItem("dept");
-        const csvConv = new CSVRecordConverter([
+        const csvConv = new cc.CSVRecordConverter([
             { name: "UUID", key: "personId" },
             { name: "姓名", key: "name" },
             { name: "身份证", key: "cardNo" },
@@ -196,7 +133,7 @@
             if (result.content.length === 0) {
                 break;
             }
-            records.push(...await slicedMap(result.content, async basicPersonInfo => {
+            records.push(...await cc.slicedMap(result.content, async basicPersonInfo => {
                 const resp = await queryPersonInfo(
                     _.chain(basicPersonInfo)
                         .pick(["relId", "personId", "houseId", "jwId"])

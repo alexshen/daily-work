@@ -257,16 +257,88 @@ window.cc = (function() {
         return xhr.response;
     }
 
+    /**
+     * generate a random string from the source string
+     * @param {Array} s - source string
+     * @param {number} len - length of the resulting random string
+     */
+    function randomString(s, len) {
+        let res = '';
+        while (len--) {
+            res += s[Math.random() * s.length | 0];
+        }
+        return res;
+    }
+
+    class CSVRecordConverter {
+        /**
+         * 
+         * @param {Object[]} headerDescriptors 
+         * @param {string} headerDescriptors[].name - name of the header
+         * @param {string} headerDescriptors[].key - key name of the header value in a source object
+         * @param {string} headerDescriptors[].default - the default value if the key does not exist
+         */
+        constructor(headerDescriptors) {
+            this._headerDescriptors = headerDescriptors;
+        }
+
+        get headers() {
+            return _.map(this._headerDescriptors, e => e.name);
+        }
+
+        convertToArray(o) {
+            return _.map(this._headerDescriptors, e => _.get(o, e.key, e.default));
+        }
+    }
+
+    /**
+     * divide an array into an array of sub-arrays
+     * @param {Object[]} array - array to be sliced
+     * @param {number} sliceSize 
+     * @returns 
+     */
+    function divide(array, sliceSize) {
+        if (sliceSize <= 0) throw new Error(sliceSize);
+
+        const res = [];
+        for (let i = 0; i < array.length; i += sliceSize) {
+            res.push(array.slice(i, Math.min(i + sliceSize, array.length)));
+        }
+        return res;
+    }
+
+    /**
+     * divide the array and run each slice one by one
+     * @param {Object[]} array - source array
+     * @param {function} map - mapping function returning a Promise
+     * @param {number} sliceSize - slice size
+     * @param {function} [sliceMappingCompleted] - called when each slice has completed running, must return a Promise
+     */
+    async function slicedMap(array, map, sliceSize, sliceMappingCompleted) {
+        const results = [];
+        for (let slice of divide(array, sliceSize)) {
+            results.push(...await Promise.all(slice.map(map)));
+            if (sliceMappingCompleted) {
+                await sliceMappingCompleted();
+            }
+        }
+        return results;
+    }
+
     return {
         delay: delay,
         XHRInterceptor: XHRInterceptor,
         XHRInterceptorUtils: XHRInterceptorUtils,
         RequestWaiter: RequestWaiter,
+        CSVRecordConverter: CSVRecordConverter,
         waitUntilRequestDone: waitUntilRequestDone,
         readFile: readFile,
         objectFromKeyValueArrays: objectFromKeyValueArrays,
         readRecords: readRecords,
         doRequest: doRequest,
         readLines: readLines,
+        randomString: randomString,
+        divide: divide,
+        slicedMap: slicedMap,
     };
 })();
