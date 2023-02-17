@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.2
+// @version      0.3
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -148,7 +148,10 @@
                 return csvConv.convertToArray(personInfo);
             }, 10, async () => await cc.delay(100)));
         }
-        console.log(records.map(e => e.join('\t')).join('\n'));
+        const text = records.map(e => e.join('\t')).join('\n');
+        console.log(text);
+        await navigator.clipboard.writeText(text);
+        alert("Residents have been copied to the clipboard.");
 
         function clean(s) {
             return s.trim().replace(/\r\n|\r|\n/, ' ');
@@ -176,7 +179,7 @@
     }
 
     window.addEventListener('load', () => {
-        GM_registerMenuCommand('List Users', () => {
+        GM_registerMenuCommand('Dump Residents', () => {
             dumpResidents();
         });
 
