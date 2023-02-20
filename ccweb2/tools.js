@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.3
+// @version      0.4
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -166,6 +166,16 @@
     /**
      * 
      * @param {Object} params query parameters
+     * @param {string} params.deptId department Id
+     */
+    async function queryCurrentDept(params) {
+        const url = new URL('/sqy-admin/api/sqAddress/queryCurrentDept', document.location.origin);
+        return await doRequest(url, "GET", null, params);
+    }
+
+    /**
+     * 
+     * @param {Object} params query parameters
      * @param {string} params.relId
      * @param {string} params.personId 
      * @param {string} params.houseId
@@ -186,6 +196,14 @@
         GM_registerMenuCommand('Print RSA Public Key', () => {
             console.log(g_state.rsaPublicKey);
         });
+
+        // heartbeat
+        setInterval(() => {
+            const deptId = Cookie.getItem('dept');
+            if (deptId !== undefined) {
+                queryCurrentDept({ deptId: deptId });
+            }
+        }, 60 * 1000);
     });
 })();
 
