@@ -3,11 +3,11 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.10
+// @version 0.11
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
-// @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/common.js
-// @require https://raw.githubusercontent.com/alexshen/daily-work/main/community-cloud/utils.js
+// @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/common.js
+// @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/utils.js
 // ==/UserScript==
 
 /* global cc, ccu, GM_registerMenuCommand */
