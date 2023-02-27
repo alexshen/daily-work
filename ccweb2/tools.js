@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.5
+// @version      0.6
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -155,7 +155,7 @@
         alert("Residents have been copied to the clipboard.");
 
         function clean(s) {
-            return s.trim().replace(/\r\n|\r|\n/, ' ');
+            return s ? s.trim().replace(/\r\n|\r|\n/, ' ') : s;
         }
     }
 
