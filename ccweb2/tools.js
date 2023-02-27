@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.4
+// @version      0.5
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -118,6 +118,7 @@
             { name: "身份证", key: "cardNo" },
             { name: "电话", key: "phone" },
             { name: "户籍地址", key: "hjdz" },
+            { name: "居住ID", key: "relId" },
             { name: "居住地址", key: "jzdz" },
             { name: "在住", key: "liveStatus" },
             { name: "人员类型", key: "personType" },
@@ -141,7 +142,7 @@
                         .value()
                 );
                 const personInfo = _.chain(resp)
-                    .pick(["name", "phone", "cardNo", "hjdz", "personId", "personType", "tags", "liveStatus"])
+                    .pick(["name", "phone", "cardNo", "hjdz", "personId", "personType", "tags", "relId", "liveStatus"])
                     .merge(_.pick(basicPersonInfo, "jzdz"))
                     .update('hjdz', clean)
                     .value();
