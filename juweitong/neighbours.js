@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.11
+// @version 0.12
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/common.js
@@ -157,11 +157,18 @@ async function deactivateMember(uuid) {
     return resp.success;
 }
 
+async function removeMember(uuid) {
+    const url = new URL('/neighbour/common/member_auth_remove', document.location.origin);
+    const resp = await get(url, { member: uuid }, null, 'json');
+    return resp.success;
+}
+
 window.addEventListener('load', () => {
     GM_registerMenuCommand("Dump Members", () => {
         const cid = /cid=(.+)/.exec(document.URL)[1];
         dumpAllMembers(cid);
     });
+
     GM_registerMenuCommand("Dump Credits", () => {
         const [year, from, to] = prompt('Specify the date range to dump credits, year [from [to]]')
                                 .split(' ')
@@ -177,6 +184,7 @@ window.addEventListener('load', () => {
         }
         dumpCreditsBetweenMonths(year, from, to);
     });
+
     GM_registerMenuCommand("Deactivate Members", async () => {
         const fname = await ccu.selectFile();
         if (!fname) {
@@ -187,6 +195,20 @@ window.addEventListener('load', () => {
                 console.log(`deactivated ${r.uuid}`);
             } else {
                 console.log(`failed to deactivate ${r.uuid}`);
+            }
+        }
+    });
+
+    GM_registerMenuCommand("Remove Members", async () => {
+        const fname = await ccu.selectFile();
+        if (!fname) {
+            return;
+        }
+        for (let r of await cc.readRecords(fname)) {
+            if (await removeMember(r.uuid)) {
+                console.log(`removed ${r.uuid}`);
+            } else {
+                console.log(`failed to remove ${r.uuid}`);
             }
         }
     });
