@@ -23,8 +23,9 @@ class Vector:
 
     def normalize(self):
         mag = self.magnitude
-        for i in range(len(self._v)):
-            self._v[i] /= mag
+        if mag >= 1e-6:
+            for i in range(len(self._v)):
+                self._v[i] /= mag
 
     def normalized(self):
         v = Vector(*self._v)
