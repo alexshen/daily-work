@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.12
+// @version 0.13
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/common.js
@@ -183,6 +183,20 @@ window.addEventListener('load', () => {
             throw new Error("Invalid ending month");
         }
         dumpCreditsBetweenMonths(year, from, to);
+    });
+
+    GM_registerMenuCommand("Activate Members", async () => {
+        const fname = await ccu.selectFile();
+        if (!fname) {
+            return;
+        }
+        for (let r of await cc.readRecords(fname)) {
+            if (await activateMember(r.uuid)) {
+                console.log(`activated ${r.uuid}`);
+            } else {
+                console.log(`failed to activate ${r.uuid}`);
+            }
+        }
     });
 
     GM_registerMenuCommand("Deactivate Members", async () => {
