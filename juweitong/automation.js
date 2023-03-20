@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like All New Posts
 // @author  ashen
-// @version 0.6
+// @version 0.7
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // ==/UserScript==
@@ -38,7 +38,7 @@ async function waitUntilPageAttached() {
     return await delay(500);
 }
 
-async function likePost(post) {
+async function likePost(post, favText) {
     // check if this is a new post
     if (post.querySelector('span.ui-1-tag.mi-q-new')) {
         // show the post
@@ -46,7 +46,7 @@ async function likePost(post) {
         await waitUntilLoadingFinishes();
         // check if already liked
         let likeButton = document.querySelector('div.mi-reply-panel > a');
-        if (likeButton.querySelector('span#cmdLike').innerText === '点赞') {
+        if (likeButton.querySelector('span#cmdLike').innerText === favText) {
             likeButton.click();
             await delay(500);
         }
@@ -55,15 +55,22 @@ async function likePost(post) {
     }
 }
 
-const POST_ARTICLE_CLASS = 'div.list-group-item.ui-1-article > a';
-const POST_SUBJECT_CLASS = 'div.list-group-item.ui-1-advice > a';
+const POST_ARTICLE_CONFIG = {
+    klass: 'div.list-group-item.ui-1-article > a',
+    favText: '点赞'
+};
 
-async function likeAllPosts(postClass) {
+const POST_SUBJECT_CONFIG = {
+    klass: 'div.list-group-item.ui-1-advice > a',
+    favText: '赞成'
+};
+
+async function likeAllPosts(postConfig) {
     // find all posts
-    let posts = document.querySelectorAll(postClass);
+    let posts = document.querySelectorAll(postConfig.klass);
     console.log('number of posts: ' + posts.length);
     for (let post of posts) {
-        await likePost(post);
+        await likePost(post, postConfig.favText);
     }
     console.log('finish liking posts');
 }
@@ -81,7 +88,7 @@ async function visitNotices() {
     await waitUntilLoadingFinishes();
     document.querySelector('span.ui-1-sub-header-more').click();
     await waitUntilLoadingFinishes();
-    await likeAllPosts(POST_ARTICLE_CLASS);
+    await likeAllPosts(POST_ARTICLE_CONFIG);
     await back();
     return await back();
 }
@@ -91,7 +98,7 @@ async function visitMyNeighbors() {
     let button = document.querySelector('span.iconfont.if-icon.if-icon-around');
     button.click();
     await waitUntilLoadingFinishes();
-    await likeAllPosts(POST_ARTICLE_CLASS);
+    await likeAllPosts(POST_ARTICLE_CONFIG);
     return await back();
 }
 
@@ -102,7 +109,7 @@ async function visitPartyArea() {
     await waitUntilLoadingFinishes();
     document.querySelector('span.ui-1-sub-header-more').click();
     await waitUntilLoadingFinishes();
-    await likeAllPosts(POST_ARTICLE_CLASS);
+    await likeAllPosts(POST_ARTICLE_CONFIG);
     await back();
     return await back();
 }
@@ -112,7 +119,7 @@ async function visitAutonomyBoard() {
     let button = document.querySelector('span.iconfont.if-icon.if-icon-advice');
     button.click();
     await waitUntilLoadingFinishes();
-    await likeAllPosts(POST_SUBJECT_CLASS);
+    await likeAllPosts(POST_SUBJECT_CONFIG);
     await back();
 }
 
