@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like All New Posts
 // @author  ashen
-// @version 0.5
+// @version 0.6
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // ==/UserScript==
@@ -55,9 +55,12 @@ async function likePost(post) {
     }
 }
 
-async function likeAllPosts() {
+const POST_ARTICLE_CLASS = 'div.list-group-item.ui-1-article > a';
+const POST_SUBJECT_CLASS = 'div.list-group-item.ui-1-advice > a';
+
+async function likeAllPosts(postClass) {
     // find all posts
-    let posts = document.querySelectorAll('div.list-group-item.ui-1-article > a');
+    let posts = document.querySelectorAll(postClass);
     console.log('number of posts: ' + posts.length);
     for (let post of posts) {
         await likePost(post);
@@ -78,7 +81,7 @@ async function visitNotices() {
     await waitUntilLoadingFinishes();
     document.querySelector('span.ui-1-sub-header-more').click();
     await waitUntilLoadingFinishes();
-    await likeAllPosts();
+    await likeAllPosts(POST_ARTICLE_CLASS);
     await back();
     return await back();
 }
@@ -88,7 +91,7 @@ async function visitMyNeighbors() {
     let button = document.querySelector('span.iconfont.if-icon.if-icon-around');
     button.click();
     await waitUntilLoadingFinishes();
-    await likeAllPosts();
+    await likeAllPosts(POST_ARTICLE_CLASS);
     return await back();
 }
 
@@ -99,9 +102,18 @@ async function visitPartyArea() {
     await waitUntilLoadingFinishes();
     document.querySelector('span.ui-1-sub-header-more').click();
     await waitUntilLoadingFinishes();
-    await likeAllPosts(false);
+    await likeAllPosts(POST_ARTICLE_CLASS);
     await back();
     return await back();
+}
+
+async function visitAutonomyBoard() {
+    console.log('visit autonomy board');
+    let button = document.querySelector('span.iconfont.if-icon.if-icon-advice');
+    button.click();
+    await waitUntilLoadingFinishes();
+    await likeAllPosts(POST_SUBJECT_CLASS);
+    await back();
 }
 
 async function changeMember(i) {
@@ -151,6 +163,8 @@ window.addEventListener('load', () => {
             .then(() => visitMyNeighbors())
             .then(() => waitUntilPageAttached())
             .then(() => visitPartyArea())
+            .then(() => waitUntilPageAttached())
+            .then(() => visitAutonomyBoard())
             .then(() => waitUntilPageAttached())
             .then(() => alert('Finished'));
     });
