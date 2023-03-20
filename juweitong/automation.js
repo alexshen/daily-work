@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like All New Posts
 // @author  ashen
-// @version 0.7
+// @version 0.8
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // ==/UserScript==
@@ -164,7 +164,7 @@ window.addEventListener('load', () => {
         console.log('patched');
     }
 
-    GM_registerMenuCommand("Do Like", () => {
+    GM_registerMenuCommand("Like All", () => {
         visitNotices()
             .then(() => waitUntilPageAttached())
             .then(() => visitMyNeighbors())
@@ -172,6 +172,30 @@ window.addEventListener('load', () => {
             .then(() => visitPartyArea())
             .then(() => waitUntilPageAttached())
             .then(() => visitAutonomyBoard())
+            .then(() => waitUntilPageAttached())
+            .then(() => alert('Finished'));
+    });
+
+    GM_registerMenuCommand("Like Notices", () => {
+        visitNotices()
+            .then(() => waitUntilPageAttached())
+            .then(() => alert('Finished'));
+    });
+
+    GM_registerMenuCommand("Like My Neighbors", () => {
+        visitMyNeighbors()
+            .then(() => waitUntilPageAttached())
+            .then(() => alert('Finished'));
+    });
+
+    GM_registerMenuCommand("Like Party Area", () => {
+        visitPartyArea()
+            .then(() => waitUntilPageAttached())
+            .then(() => alert('Finished'));
+    });
+
+    GM_registerMenuCommand("Like Autonomy Board", () => {
+        visitAutonomyBoard()
             .then(() => waitUntilPageAttached())
             .then(() => alert('Finished'));
     });
