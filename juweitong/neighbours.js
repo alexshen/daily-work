@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.13
+// @version 0.14
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/common.js
@@ -171,7 +171,7 @@ window.addEventListener('load', () => {
 
     GM_registerMenuCommand("Dump Credits", () => {
         const [year, from, to] = prompt('Specify the date range to dump credits, year [from [to]]')
-                                .split(' ')
+                                ?.split(' ')
                                 .map(e => parseInt(e, 10));
         if (year === undefined || isNaN(year)) {
             throw new Error('Invalid year');
