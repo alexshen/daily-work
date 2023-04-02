@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.15
+// @version 0.17
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/common.js
@@ -116,7 +116,7 @@ async function getCredits(params) {
             month: params ? `${params.year}${params.month.toString().padStart(2, '0')}` : null,
             page: page,
             pagecount: COUNT.toString(),
-            type: 1
+            type: params ? 1 : 0
         });
         for (let e of res) {
             creditRecords.push([
@@ -156,7 +156,7 @@ async function dumpCreditsBetweenMonths(year, from, to) {
 const CREDIT_HEADERS = ['UUID', '姓名', '分数']
 
 async function dumpTotalCredits() {
-    const records = [CREDIT_HEADERS, ...getCredits()];
+    const records = [CREDIT_HEADERS, ...await getCredits()];
     console.log(records.map(e => e.join('\t')).join('\n'));
 }
 
