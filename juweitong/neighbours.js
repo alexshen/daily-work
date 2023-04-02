@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.14
+// @version 0.15
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/common.js
@@ -97,9 +97,14 @@ async function dumpAllMembers(cid) {
     console.log(members.flatMap(e => e.join('\t')).join('\n'));
 }
 
-const CREDIT_HEADERS = ['UUID', '姓名', '分数', '年', '月']
-
-async function getCredits(year, month) {
+/**
+ * get credits for members, if params is given, returns the credits for the specified month
+ * @param {object} params 
+ * @param {number} params.year
+ * @param {number} params.month
+ * @returns an array of credit records. A credit record is an object with properties id, name and grade.
+ */
+async function getCredits(params) {
     const url = new URL('/neighbour/api/point_log/creditrank', document.location.origin);
     let page = 1;
     const COUNT = 20;
@@ -108,7 +113,7 @@ async function getCredits(year, month) {
     while (hasMore) {
         const res = await postJson(url, {
             community: "0",
-            month: `${year}${month.toString().padStart(2, '0')}`,
+            month: params ? `${params.year}${params.month.toString().padStart(2, '0')}` : null,
             page: page,
             pagecount: COUNT.toString(),
             type: 1
@@ -117,9 +122,7 @@ async function getCredits(year, month) {
             creditRecords.push([
                 e.id,
                 e.name,
-                e.grade,
-                year,
-                month
+                e.grade
             ]);
         }
         hasMore = res.length === COUNT;
@@ -127,6 +130,8 @@ async function getCredits(year, month) {
     }
     return creditRecords;
 }
+
+const CREDIT_HEADERS_WITH_MONTH = ['UUID', '姓名', '分数', '年', '月']
 
 async function dumpCreditsBetweenMonths(year, from, to) {
     to = to || from || 12;
@@ -136,12 +141,22 @@ async function dumpCreditsBetweenMonths(year, from, to) {
         throw new Error("Invalid month range");
     }
 
-    const records = [];
+    const records = [CREDIT_HEADERS_WITH_MONTH];
     for (let i = from; i <= to; ++i) {
-        records.push(...await getCredits(year, i));
+        for (let r of await getCredits({ year, month: i })) {
+            r.year = year;
+            r.month = i;
+            records.push(r);
+        }
         await cc.delay(500);
     }
-    records.unshift(CREDIT_HEADERS);
+    console.log(records.map(e => e.join('\t')).join('\n'));
+}
+
+const CREDIT_HEADERS = ['UUID', '姓名', '分数']
+
+async function dumpTotalCredits() {
+    const records = [CREDIT_HEADERS, ...getCredits()];
     console.log(records.map(e => e.join('\t')).join('\n'));
 }
 
@@ -169,7 +184,7 @@ window.addEventListener('load', () => {
         dumpAllMembers(cid);
     });
 
-    GM_registerMenuCommand("Dump Credits", () => {
+    GM_registerMenuCommand("Dump Credits For Month", () => {
         const [year, from, to] = prompt('Specify the date range to dump credits, year [from [to]]')
                                 ?.split(' ')
                                 .map(e => parseInt(e, 10));
@@ -183,6 +198,10 @@ window.addEventListener('load', () => {
             throw new Error("Invalid ending month");
         }
         dumpCreditsBetweenMonths(year, from, to);
+    });
+
+    GM_registerMenuCommand("Dump Total Credits", () => {
+        dumpTotalCredits();
     });
 
     GM_registerMenuCommand("Activate Members", async () => {
