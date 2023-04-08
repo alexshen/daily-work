@@ -1,14 +1,15 @@
 'use strict';
 
 // ==UserScript==
-// @name    Like All New Posts
+// @name    Like Posts
 // @author  ashen
-// @version 0.8
+// @version 0.9
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
+// @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
 // ==/UserScript==
 
-/* global GM_registerMenuCommand */
+/* global GM_registerMenuCommand, cc */
 
 function delay(time) {
     return new Promise(resolve => {
@@ -87,7 +88,7 @@ async function visitNotices() {
     button.click();
     await waitUntilLoadingFinishes();
     document.querySelector('span.ui-1-sub-header-more').click();
-    await waitUntilLoadingFinishes();
+    await new cc.RequestWaiter(r => /notice_list_more/.test(r.responseURL));
     await likeAllPosts(POST_ARTICLE_CONFIG);
     await back();
     return await back();
@@ -97,7 +98,7 @@ async function visitMyNeighbors() {
     console.log('visit my neighbors');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-around');
     button.click();
-    await waitUntilLoadingFinishes();
+    await new cc.RequestWaiter(r => /around_help_list_more/.test(r.responseURL));
     await likeAllPosts(POST_ARTICLE_CONFIG);
     return await back();
 }
@@ -108,7 +109,7 @@ async function visitPartyArea() {
     button.click();
     await waitUntilLoadingFinishes();
     document.querySelector('span.ui-1-sub-header-more').click();
-    await waitUntilLoadingFinishes();
+    await new cc.RequestWaiter(r => /ccp_list_more/.test(r.responseURL));
     await likeAllPosts(POST_ARTICLE_CONFIG);
     await back();
     return await back();
@@ -118,7 +119,7 @@ async function visitAutonomyBoard() {
     console.log('visit autonomy board');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-advice');
     button.click();
-    await waitUntilLoadingFinishes();
+    await new cc.RequestWaiter(r => /proposal_list_more/.test(r.responseURL));
     await likeAllPosts(POST_SUBJECT_CONFIG);
     await back();
 }
