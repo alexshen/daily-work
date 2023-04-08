@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.10
+// @version 0.12
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -69,11 +69,9 @@ const POST_SUBJECT_CONFIG = {
 async function likeAllPosts(postConfig) {
     // find all posts
     let posts = document.querySelectorAll(postConfig.klass);
-    console.log('number of posts: ' + posts.length);
     for (let post of posts) {
         await likePost(post, postConfig.favText);
     }
-    console.log('finish liking posts');
 }
 
 async function back() {
@@ -152,7 +150,7 @@ function removeUnvisitedCommunities() {
 }
 
 async function tryContinueAutoVisit() {
-    await new cc.RequestWaiter(r => /indexnew_list/.test(r.responseURL));
+    await new cc.RequestWaiter(r => /communities/.test(r.responseURL));
 
     let communites = getUnvisitedCommunities();
     if (communites?.length) {
@@ -186,6 +184,7 @@ async function tryVisitNextCommunity() {
     selectCommunity(communities[0]);
     dismissCommunityPanel(true);
     setUnvisitedCommunities(communities);
+    return true;
 }
 
 function getCommunitiesFromPanel() {
@@ -208,7 +207,13 @@ async function showCommunityPanel() {
         button = document.querySelector('.ui-1-ct-header-index');
         await delay(100);
     } while (!button);
-    button.click();
+
+    let panel;
+    do {
+        button.click();
+        await delay(100);
+        panel = document.querySelector('.sqt-lib-roles-content');
+    } while (!panel);
     await delay(800);
 }
 
@@ -246,11 +251,17 @@ window.addEventListener('load', () => {
         unsafeWindow.g_isPatched = true;
     }
 
-    tryContinueAutoVisit();
+    tryContinueAutoVisit().then(hasMore => {
+        if (!hasMore) {
+            alert('Finished');
+        }
+    });
 
     GM_registerMenuCommand("Like All Communities", async () => {
         await likeAll();
-        await tryVisitNextCommunity();
+        if (!await tryVisitNextCommunity()) {
+            alert('Finished');
+        }
     });
 
     GM_registerMenuCommand("Like All", () => {
