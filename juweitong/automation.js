@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.12
+// @version 0.13
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -149,18 +149,27 @@ function removeUnvisitedCommunities() {
     sessionStorage.removeItem(KEY_COMMUNITIES);
 }
 
+const VISIT_STATE_HAS_MORE = 0;
+const VISIT_STATE_FINISHED = 1;
+const VISIT_STATE_NOT_STARTED = 2;
+
 async function tryContinueAutoVisit() {
     await new cc.RequestWaiter(r => /communities/.test(r.responseURL));
 
     let communites = getUnvisitedCommunities();
-    if (communites?.length) {
-        await likeAll();
-        return await tryVisitNextCommunity();
+    if (communites === undefined) {
+        return VISIT_STATE_NOT_STARTED;
     }
-    return false;
+    if (communites.length) {
+        await likeAll();
+        return await trySwitchToNextCommunity() ? VISIT_STATE_HAS_MORE : VISIT_STATE_FINISHED;
+    }
+    // in case something went wrong
+    removeUnvisitedCommunities();
+    return VISIT_STATE_NOT_STARTED;
 }
 
-async function tryVisitNextCommunity() {
+async function trySwitchToNextCommunity() {
     let visible = false;
     let communities = getUnvisitedCommunities();
     if (communities === undefined) {
@@ -251,15 +260,15 @@ window.addEventListener('load', () => {
         unsafeWindow.g_isPatched = true;
     }
 
-    tryContinueAutoVisit().then(hasMore => {
-        if (!hasMore) {
-            alert('Finished');
+    tryContinueAutoVisit().then((state) => {
+        if (state === VISIT_STATE_FINISHED) {
+            alert("Finished");
         }
     });
 
     GM_registerMenuCommand("Like All Communities", async () => {
         await likeAll();
-        if (!await tryVisitNextCommunity()) {
+        if (!await trySwitchToNextCommunity()) {
             alert('Finished');
         }
     });
