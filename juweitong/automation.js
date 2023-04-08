@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.13
+// @version 0.14
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -49,7 +49,7 @@ async function likePost(post, favText) {
         let likeButton = document.querySelector('div.mi-reply-panel > a');
         if (likeButton.querySelector('span#cmdLike').innerText === favText) {
             likeButton.click();
-            await delay(500);
+            await new cc.RequestWaiter(r => /title_like/.test(r.responseURL));
         }
         document.querySelector('a.mi-line-body').click();
         await waitUntilLoadingFinishes();
