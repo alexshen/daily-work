@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.9
+// @version 0.10
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -124,56 +124,137 @@ async function visitAutonomyBoard() {
     await back();
 }
 
-async function changeMember(i) {
-    document.querySelector('a#showChangeMember').click();
-    await delay(1000);
-    let members = document.querySelector('div.van-cell-group.van-hairline--top-bottom');
-    members.children[i].click();
-    await delay(1000);
-    document.querySelector('div.sqt-lib-roles-foot').lastElementChild.click();
+async function likeAll() {
+    await visitNotices();
+    await waitUntilPageAttached();
+    await visitMyNeighbors();
+    await waitUntilPageAttached();
+    await visitPartyArea();
+    await waitUntilPageAttached();
+    await visitAutonomyBoard();
+    await waitUntilPageAttached();
 }
+
+const KEY_COMMUNITIES = "communities";
+
+function getUnvisitedCommunities() {
+    return sessionStorage.getItem(KEY_COMMUNITIES)
+            ?.split(';')
+            .map(e => parseInt(e, 10));
+}
+
+function setUnvisitedCommunities(communities) {
+    sessionStorage.setItem(KEY_COMMUNITIES, communities.join(';'));
+}
+
+function removeUnvisitedCommunities() {
+    sessionStorage.removeItem(KEY_COMMUNITIES);
+}
+
+async function tryContinueAutoVisit() {
+    await new cc.RequestWaiter(r => /indexnew_list/.test(r.responseURL));
+
+    let communites = getUnvisitedCommunities();
+    if (communites?.length) {
+        await likeAll();
+        return await tryVisitNextCommunity();
+    }
+    return false;
+}
+
+async function tryVisitNextCommunity() {
+    let visible = false;
+    let communities = getUnvisitedCommunities();
+    if (communities === undefined) {
+        visible = true;
+        await showCommunityPanel();
+        communities = getCommunitiesFromPanel();
+        console.log("unvisited communities:" + communities.length);
+        if (communities.length === 1) {
+            dismissCommunityPanel(false);
+            return false;
+        }
+    }
+    communities.shift();
+    if (communities.length === 0) {
+        removeUnvisitedCommunities();
+        return false;
+    }
+    if (!visible) {
+        await showCommunityPanel();
+    }
+    selectCommunity(communities[0]);
+    dismissCommunityPanel(true);
+    setUnvisitedCommunities(communities);
+}
+
+function getCommunitiesFromPanel() {
+    const communities = [];
+    const radioButtons = document.querySelectorAll('.sqt-lib-roles-content .van-radio');
+    radioButtons.forEach((button, i) => {
+        const checked = button.getAttribute('aria-checked') === "true";
+        if (checked) {
+            communities.unshift(i);
+        } else {
+            communities.push(i);
+        }
+    });
+    return communities;
+}
+
+async function showCommunityPanel() {
+    let button;
+    do {
+        button = document.querySelector('.ui-1-ct-header-index');
+        await delay(100);
+    } while (!button);
+    button.click();
+    await delay(800);
+}
+
+function dismissCommunityPanel(ok) {
+    document.querySelector(`.sqt-lib-roles-foot div:nth-child(${ok + 1})`).click();
+}
+
+function selectCommunity(index) {
+    document.querySelectorAll('.sqt-lib-roles-content .van-radio')[index].click();
+}
+
 
 window.addEventListener('load', () => {
     if (!unsafeWindow.g_isPatched) {
-        console.log('patching');
-
         var script = unsafeWindow.document.createElement('script');
         script.type = 'text/javascript';
         script.innerText = "\
 			let orgOnAttached = mi.page.onAttached;\
 			mi.page.onAttached = function () {\
-                console.log('Page attached');\
                 g_attached = true;\
                 return orgOnAttached.apply(mi.page, arguments);\
     		};\
             let orgLoadingToast = mi.loadingToast;\
             mi.loadingToast = function () {\
-                console.log('Loading ' + Date.now());\
                 g_isLoading = true;\
                 let t = orgLoadingToast.apply(mi, arguments);\
                 let orgHide = t.hide;\
                 t.hide = function () {\
-                    console.log('Loading finished ' + Date.now());\
                     g_isLoading = false;\
                     return orgHide.apply(t, arguments);\
                 };\
                 return t;\
             };";
         unsafeWindow.document.getElementsByTagName('head')[0].appendChild(script);
-
         unsafeWindow.g_isPatched = true;
-        console.log('patched');
     }
 
+    tryContinueAutoVisit();
+
+    GM_registerMenuCommand("Like All Communities", async () => {
+        await likeAll();
+        await tryVisitNextCommunity();
+    });
+
     GM_registerMenuCommand("Like All", () => {
-        visitNotices()
-            .then(() => waitUntilPageAttached())
-            .then(() => visitMyNeighbors())
-            .then(() => waitUntilPageAttached())
-            .then(() => visitPartyArea())
-            .then(() => waitUntilPageAttached())
-            .then(() => visitAutonomyBoard())
-            .then(() => waitUntilPageAttached())
+        likeAll()
             .then(() => alert('Finished'));
     });
 
