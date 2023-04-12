@@ -11,12 +11,6 @@
 
 /* global GM_registerMenuCommand, cc */
 
-function delay(time) {
-    return new Promise(resolve => {
-        setTimeout(resolve, time);
-    });
-}
-
 function waitUntilCondition(cond) {
     return new Promise(resolve => {
         // repeatedly checking the condition
@@ -31,12 +25,12 @@ function waitUntilCondition(cond) {
 
 async function waitUntilLoadingFinishes() {
     await waitUntilCondition(() => !unsafeWindow.g_isLoading);
-    return await delay(500);
+    return await cc.delay(500);
 }
 
 async function waitUntilPageAttached() {
     await waitUntilCondition(() => unsafeWindow.g_attached);
-    return await delay(500);
+    return await cc.delay(500);
 }
 
 async function likePost(post, favText) {
@@ -251,16 +245,16 @@ async function showCommunityPanel() {
     let button;
     do {
         button = document.querySelector('.ui-1-ct-header-index');
-        await delay(100);
+        await cc.delay(100);
     } while (!button);
 
     let panel;
     do {
         button.click();
-        await delay(100);
+        await cc.delay(100);
         panel = document.querySelector('.sqt-lib-roles-content');
     } while (!panel);
-    await delay(800);
+    await cc.delay(800);
 }
 
 function dismissCommunityPanel(ok) {
