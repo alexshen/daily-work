@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.14
+// @version 0.15
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -40,37 +40,56 @@ async function waitUntilPageAttached() {
 }
 
 async function likePost(post, favText) {
-    // check if this is a new post
-    if (post.querySelector('span.ui-1-tag.mi-q-new')) {
-        // show the post
-        post.click();
-        await waitUntilLoadingFinishes();
-        // check if already liked
-        let likeButton = document.querySelector('div.mi-reply-panel > a');
-        if (likeButton.querySelector('span#cmdLike').innerText === favText) {
-            likeButton.click();
-            await new cc.RequestWaiter(r => /title_like/.test(r.responseURL));
-        }
-        document.querySelector('a.mi-line-body').click();
-        await waitUntilLoadingFinishes();
+    // show the post
+    post.click();
+    await waitUntilLoadingFinishes();
+    // check if already liked
+    let likeButton = document.querySelector("div.mi-reply-panel > a");
+    if (likeButton.querySelector("span#cmdLike").innerText === favText) {
+        likeButton.click();
+        await new cc.RequestWaiter((r) => /title_like/.test(r.responseURL));
     }
+    document.querySelector("a.mi-line-body").click();
+    await waitUntilLoadingFinishes();
 }
 
 const POST_ARTICLE_CONFIG = {
     klass: 'div.list-group-item.ui-1-article > a',
-    favText: '点赞'
+    favText: '点赞',
+    async filter(post) {
+        // only visit new posts
+        return post.querySelector('span.ui-1-tag.mi-q-new');
+    }
 };
 
-const POST_SUBJECT_CONFIG = {
-    klass: 'div.list-group-item.ui-1-advice > a',
-    favText: '赞成'
-};
+function createPostSubjectConfig(newPostOnly) {
+    return {
+        klass: 'div.list-group-item.ui-1-advice > a',
+        favText: '赞成',
+        async filter(post) {
+            if (newPostOnly) {
+                return post.querySelector('span.ui-1-tag.mi-q-new');
+            }
+            if (post.querySelector('.ui-1-tag-unproposal')?.innerText !== '项目') {
+                return false;
+            }
+            const url = window.location.origin + /'([^']+)'/.exec(post.getAttribute('href'))[1];
+            const resp = await cc.doRequest(url, 'GET');
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(resp, 'text/html');
+            const likeButton = doc.querySelector("div.mi-reply-panel > a");
+            return likeButton.querySelector("span#cmdLike").innerText === this.favText;
+        }
+    };
+}
 
 async function likeAllPosts(postConfig) {
     // find all posts
     let posts = document.querySelectorAll(postConfig.klass);
     for (let post of posts) {
-        await likePost(post, postConfig.favText);
+        if (await postConfig.filter(post)) {
+            await likePost(post, postConfig.favText);
+        }
     }
 }
 
@@ -113,27 +132,28 @@ async function visitPartyArea() {
     return await back();
 }
 
-async function visitAutonomyBoard() {
+async function visitAutonomyBoard(newPostsOnly) {
     console.log('visit autonomy board');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-advice');
     button.click();
     await new cc.RequestWaiter(r => /proposal_list_more/.test(r.responseURL));
-    await likeAllPosts(POST_SUBJECT_CONFIG);
+    await likeAllPosts(createPostSubjectConfig(newPostsOnly));
     await back();
 }
 
-async function likeAll() {
+async function likeAll(newPostsOnly) {
     await visitNotices();
     await waitUntilPageAttached();
     await visitMyNeighbors();
     await waitUntilPageAttached();
     await visitPartyArea();
     await waitUntilPageAttached();
-    await visitAutonomyBoard();
+    await visitAutonomyBoard(newPostsOnly);
     await waitUntilPageAttached();
 }
 
 const KEY_COMMUNITIES = "communities";
+const KEY_ONLY_NEW_POSTS = "only_new_posts";
 
 function getUnvisitedCommunities() {
     return sessionStorage.getItem(KEY_COMMUNITIES)
@@ -149,6 +169,23 @@ function removeUnvisitedCommunities() {
     sessionStorage.removeItem(KEY_COMMUNITIES);
 }
 
+function setVisitOnlyNewPosts(onlyNewPosts) {
+    sessionStorage.setItem(KEY_ONLY_NEW_POSTS, onlyNewPosts ? 1 : 0);
+}
+
+function getVisitOnlyNewPosts() {
+    return (sessionStorage.getItem(KEY_ONLY_NEW_POSTS) | 0) !== 0;
+}
+
+function removeVisitOnNewPosts() {
+    sessionStorage.removeItem(KEY_ONLY_NEW_POSTS);
+}
+
+function cleanupAutoVisitStates() {
+    removeUnvisitedCommunities();
+    removeVisitOnNewPosts();
+}
+
 const VISIT_STATE_HAS_MORE = 0;
 const VISIT_STATE_FINISHED = 1;
 const VISIT_STATE_NOT_STARTED = 2;
@@ -161,11 +198,11 @@ async function tryContinueAutoVisit() {
         return VISIT_STATE_NOT_STARTED;
     }
     if (communites.length) {
-        await likeAll();
+        await likeAll(getVisitOnlyNewPosts());
         return await trySwitchToNextCommunity() ? VISIT_STATE_HAS_MORE : VISIT_STATE_FINISHED;
     }
     // in case something went wrong
-    removeUnvisitedCommunities();
+    cleanupAutoVisitStates();
     return VISIT_STATE_NOT_STARTED;
 }
 
@@ -184,7 +221,7 @@ async function trySwitchToNextCommunity() {
     }
     communities.shift();
     if (communities.length === 0) {
-        removeUnvisitedCommunities();
+        cleanupAutoVisitStates();
         return false;
     }
     if (!visible) {
@@ -267,14 +304,17 @@ window.addEventListener('load', () => {
     });
 
     GM_registerMenuCommand("Like All Communities", async () => {
-        await likeAll();
+        const newPostsOnly = confirm('Only new posts');
+        setVisitOnlyNewPosts(newPostsOnly);
+        await likeAll(newPostsOnly);
         if (!await trySwitchToNextCommunity()) {
             alert('Finished');
         }
     });
 
     GM_registerMenuCommand("Like All", () => {
-        likeAll()
+        const newPostsOnly = confirm('Only new posts?');
+        likeAll(newPostsOnly)
             .then(() => alert('Finished'));
     });
 
@@ -297,7 +337,8 @@ window.addEventListener('load', () => {
     });
 
     GM_registerMenuCommand("Like Autonomy Board", () => {
-        visitAutonomyBoard()
+        const onlyNewPosts = confirm('Only new posts?');
+        visitAutonomyBoard(onlyNewPosts)
             .then(() => waitUntilPageAttached())
             .then(() => alert('Finished'));
     });
