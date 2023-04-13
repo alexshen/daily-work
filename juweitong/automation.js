@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.17
+// @version 0.18
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -129,7 +129,7 @@ async function visitPartyArea() {
 }
 
 async function visitDiscussionBoard(newPostsOnly) {
-    console.log('visit autonomy board');
+    console.log('visit discussion board');
     let button = document.querySelector('span.iconfont.if-icon.if-icon-advice');
     button.click();
     await new cc.RequestWaiter(r => /proposal_list_more/.test(r.responseURL));
@@ -335,7 +335,7 @@ window.addEventListener('load', () => {
             .then(() => alert('Finished'));
     });
 
-    GM_registerMenuCommand("Like Autonomy Board", () => {
+    GM_registerMenuCommand("Like Disccusion Board", () => {
         const onlyNewPosts = confirm('Only new posts?');
         visitDiscussionBoard(onlyNewPosts)
             .then(() => waitUntilPageAttached())
