@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.16
+// @version 0.17
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -48,7 +48,9 @@ async function likePost(post, favText) {
 }
 
 const POST_ARTICLE_CONFIG = {
-    klass: 'div.list-group-item.ui-1-article > a',
+    getPosts() {
+        return document.querySelectorAll('div.list-group-item.ui-1-article > a');
+    },
     favText: '点赞',
     async filter(post) {
         // only visit new posts
@@ -58,7 +60,9 @@ const POST_ARTICLE_CONFIG = {
 
 function createPostSubjectConfig(newPostOnly) {
     return {
-        klass: 'div.list-group-item.ui-1-advice > a',
+        getPosts() {
+            return document.querySelector('.navbar_list').querySelectorAll('div.list-group-item.ui-1-advice > a');
+        },
         favText: '赞成',
         async filter(post) {
             if (newPostOnly) {
@@ -78,9 +82,7 @@ function createPostSubjectConfig(newPostOnly) {
 }
 
 async function likeAllPosts(postConfig) {
-    // find all posts
-    let posts = document.querySelectorAll(postConfig.klass);
-    for (let post of posts) {
+    for (let post of postConfig.getPosts()) {
         if (await postConfig.filter(post)) {
             await likePost(post, postConfig.favText);
         }
@@ -131,6 +133,9 @@ async function visitDiscussionBoard(newPostsOnly) {
     let button = document.querySelector('span.iconfont.if-icon.if-icon-advice');
     button.click();
     await new cc.RequestWaiter(r => /proposal_list_more/.test(r.responseURL));
+    // make sure the subjects tab is visible
+    document.querySelector('div#slide-advice').click();
+    await cc.delay(100);
     await likeAllPosts(createPostSubjectConfig(newPostsOnly));
     await back();
 }
