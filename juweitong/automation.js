@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.18
+// @version 0.19
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -54,7 +54,7 @@ const POST_ARTICLE_CONFIG = {
     favText: '点赞',
     async filter(post) {
         // only visit new posts
-        return post.querySelector('span.ui-1-tag.mi-q-new');
+        return post.querySelector('span.ui-1-tag.mi-q-new') !== null;
     }
 };
 
@@ -82,9 +82,11 @@ function createPostSubjectConfig(newPostOnly) {
 }
 
 async function likeAllPosts(postConfig) {
-    for (let post of postConfig.getPosts()) {
-        if (await postConfig.filter(post)) {
-            await likePost(post, postConfig.favText);
+    const posts = postConfig.getPosts();
+    const results = await Promise.all(posts.map(p => postConfig.filter(p)));
+    for (let i = 0; i < results.length; ++i) {
+        if (results[i]) {
+            await likePost(posts[i], postConfig.favText);
         }
     }
 }
