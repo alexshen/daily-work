@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.20
+// @version 0.21
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -66,7 +66,7 @@ function createPostSubjectConfig(newPostOnly) {
         favText: '赞成',
         async filter(post) {
             if (newPostOnly) {
-                return post.querySelector('span.ui-1-tag.mi-q-new');
+                return post.querySelector('span.ui-1-tag.mi-q-new') !== null;
             }
             if (post.querySelector('.ui-1-tag-unproposal')?.innerText !== '项目') {
                 return false;
