@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.19
+// @version 0.20
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -82,7 +82,7 @@ function createPostSubjectConfig(newPostOnly) {
 }
 
 async function likeAllPosts(postConfig) {
-    const posts = postConfig.getPosts();
+    const posts = Array.from(postConfig.getPosts());
     const results = await Promise.all(posts.map(p => postConfig.filter(p)));
     for (let i = 0; i < results.length; ++i) {
         if (results[i]) {
