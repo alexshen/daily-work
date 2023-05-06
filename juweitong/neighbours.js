@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.17
+// @version 0.18
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
 // @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/common.js
@@ -144,8 +144,8 @@ async function dumpCreditsBetweenMonths(year, from, to) {
     const records = [CREDIT_HEADERS_WITH_MONTH];
     for (let i = from; i <= to; ++i) {
         for (let r of await getCredits({ year, month: i })) {
-            r.year = year;
-            r.month = i;
+            r.push(year);
+            r.push(i);
             records.push(r);
         }
         await cc.delay(500);
