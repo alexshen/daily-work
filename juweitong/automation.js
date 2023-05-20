@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name    Like Posts
 // @author  ashen
-// @version 0.21
+// @version 0.22
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
@@ -104,6 +104,7 @@ async function visitNotices() {
     await waitUntilLoadingFinishes();
     document.querySelector('span.ui-1-sub-header-more').click();
     await new cc.RequestWaiter(r => /notice_list_more/.test(r.responseURL));
+    await waitUntilLoadingFinishes();
     await likeAllPosts(POST_ARTICLE_CONFIG);
     await back();
     return await back();
@@ -114,6 +115,7 @@ async function visitMyNeighbors() {
     let button = document.querySelector('span.iconfont.if-icon.if-icon-around');
     button.click();
     await new cc.RequestWaiter(r => /around_help_list_more/.test(r.responseURL));
+    await waitUntilLoadingFinishes();
     await likeAllPosts(POST_ARTICLE_CONFIG);
     return await back();
 }
@@ -125,6 +127,7 @@ async function visitPartyArea() {
     await waitUntilLoadingFinishes();
     document.querySelector('span.ui-1-sub-header-more').click();
     await new cc.RequestWaiter(r => /ccp_list_more/.test(r.responseURL));
+    await waitUntilLoadingFinishes();
     await likeAllPosts(POST_ARTICLE_CONFIG);
     await back();
     return await back();
@@ -135,6 +138,7 @@ async function visitDiscussionBoard(newPostsOnly) {
     let button = document.querySelector('span.iconfont.if-icon.if-icon-advice');
     button.click();
     await new cc.RequestWaiter(r => /proposal_list_more/.test(r.responseURL));
+    await waitUntilLoadingFinishes();
     // make sure the subjects tab is visible
     document.querySelector('div#slide-advice').click();
     await cc.delay(100);
