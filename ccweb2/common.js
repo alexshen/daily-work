@@ -325,6 +325,20 @@ window.cc = (function() {
         return results;
     }
 
+    async function selectFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        let files;
+        input.onchange = e => {
+            files = e.target.files;
+        };
+        input.click();
+        while (!files) {
+            await cc.delay(100);
+        }
+        return files[0];
+    }
+
     return {
         delay: delay,
         XHRInterceptor: XHRInterceptor,
@@ -340,5 +354,6 @@ window.cc = (function() {
         randomString: randomString,
         divide: divide,
         slicedMap: slicedMap,
+        selectFile,
     };
 })();
