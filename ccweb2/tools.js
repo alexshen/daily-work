@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.6
+// @version      0.7
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js
 // @grant        GM_registerMenuCommand
 // ==/UserScript==
 
@@ -74,7 +75,16 @@
         ).toString();
     }
 
-    async function doRequest(urlOrString, method, headers, params) {
+    function aesEncrypt(key, iv, data) {
+        return CryptoJS.AES.encrypt(CryptoJS.enc.Utf8.parse(data), 
+                CryptoJS.enc.Utf8.parse(key), {
+                    iv: CryptoJS.enc.Utf8.parse(iv),
+                    mode: CryptoJS.mode.CBC,
+                    padding: CryptoJS.pad.Pkcs7
+                }).toString();
+    }
+
+    async function doRequest(urlOrString, method, headers, params, data) {
         headers = headers || {};
 
         const enc = new JSEncrypt();
@@ -86,8 +96,12 @@
         headers['Authorization'] = Cookie.getItem('SQY-ADMIN-TOKEN');
         headers['Content-Type'] = 'application/json';
 
-        const resp =  await cc.doRequest(urlOrString, method, params, null, headers, 'json');
-        return JSON.parse(aesDecrypt(key, iv, validateResponse(resp)));
+        if (data) {
+            data = aesEncrypt(key, iv, JSON.stringify(data));
+        }
+
+        const resp = await cc.doRequest(urlOrString, method, params, data, headers, 'json');
+        return resp ? JSON.parse(aesDecrypt(key, iv, validateResponse(resp))) : null;
     }
 
     cc.XHRInterceptorUtils.use('/sqy-admin/api/conf/encrypt', capturePublicKey);
@@ -189,6 +203,117 @@
         return await doRequest(url, "GET", null, _.defaults(params, { isHisList: 0 }));
     }
 
+    /**
+     *
+     * @param {Object} params query parameters
+     * @param {string} params.personName
+     * @param {string} params.jwId
+     * @param {string} params.page - defaults to 0
+     * @param {string} params.size - defaults to 20
+     */
+    async function queryPersonList(params) {
+        const url = new URL('/sqyjshd-admin/api/sqReceptionVisit/queryPersonList', document.location.origin);
+        return await doRequest(url, "GET", null, _.defaults(params, { page: 0, size: 20 }));
+    }
+
+    /**
+     *
+     * @param {Object} params query parameters
+     * @param {string} params.jwId
+     */
+    async function getWorkPersonList(params) {
+        const url = new URL('/sqyjshd-admin/api/sqReceptionVisit/getWorkPersonList', document.location.origin);
+        return await doRequest(url, "GET", null, params);
+    }
+
+    async function getCachedWorkPersonList() {
+        if (!g_state.staff) {
+            const people = await getWorkPersonList({ jwId: Cookie.getItem('dept')});
+            g_state.staff = _.fromPairs(_.map(people, e => [e.name, e.personId]))
+        }
+        return g_state.staff;
+    }
+
+    /**
+     *
+     * @param {Object} params query parameters
+     * @param {string} params.address
+     * @param {string} params.jwId
+     * @param {string} params.joinUser
+     * @param {string} params.joinUserId
+     * @param {string} params.personId
+     * @param {string} params.personName
+     * @param {string} params.relId
+     * @param {string} params.visitContent
+     * @param {string} params.visitTime UTC time
+     * @param {string} params.visitType
+     * @param {boolean} params.isSync - defaults to false
+     * @param {string} params.opTime - defaults to null
+     * @param {string} params.recorder - defaults to null
+     * @param {string} params.userId - defaults to null
+     * @param {string} params.validity - defaults to "1"
+     * @param {string} params.visitId - defaults to null
+     * @param {string} params.visitImg - defaults to null
+     */
+    async function addReceptionVisitRecord(params) {
+        const url = new URL('/sqyjshd-admin/api/sqReceptionVisit', document.location.origin);
+        return await doRequest(url, "POST", null, null, 
+            _.defaults(params, { 
+                isSync: false, opTime: null, recorder: null, userId: null,
+                validity: "1", visitId: null, visitImg: null
+            }));
+    }
+
+    const VISIT_TYPES = {
+        '接待': "1",
+        '走访': "2",
+        '电话': "3",
+        '微信': "4",
+        '楼宇视频': "5",
+        '其他': "6",
+    };
+    async function cmdAddReceptionVisitRecord() {
+        const path = await cc.selectFile();
+        if (!path) {
+            return;
+        }
+        const staff = await getCachedWorkPersonList();
+        const records = await cc.readRecords(path);
+        for (let r of records) {
+            if (r.visitType in VISIT_TYPES === false) {
+                throw new Error(`invalid visitType ${r.visitType}`);
+            }
+            if (r.joinUser in staff === false) {
+                throw new Error(`invalid joinUser ${r.joinUser}`);
+            }
+            r.visitType = VISIT_TYPES[r.visitType];
+            r.visitTime = moment(r.visitTime, "YYYY/MM/DD hh:mm");
+        }
+
+        const deptId = Cookie.getItem('dept');
+        for (let r of records) {
+            const results = await queryPersonList({personName: r.personName, jwId: deptId});
+            if (results.length === 0) {
+                console.warn(`invalid person name: ${r.personName}`);
+                continue;
+            }
+            await addReceptionVisitRecord({
+                address: results[0].address.replace('|', ' '),
+                joinUser: r.joinUser,
+                joinUserId: staff[r.joinUser],
+                jwId: deptId,
+                personId: results[0].personId,
+                personName: results[0].name,
+                relId: results[0].relId,
+                visitContent: r.visitContent,
+                visitTime: r.visitTime,
+                visitType: r.visitType
+            })
+            console.log(`added visit record: ${r.personName}`);
+            await cc.delay(100);
+        }
+    }
+
     window.addEventListener('load', () => {
         GM_registerMenuCommand('Dump Residents', () => {
             dumpResidents();
@@ -196,6 +321,10 @@
 
         GM_registerMenuCommand('Print RSA Public Key', () => {
             console.log(g_state.rsaPublicKey);
+        });
+
+        GM_registerMenuCommand('Add Visit Record', () => {
+            cmdAddReceptionVisitRecord();
         });
 
         // heartbeat
