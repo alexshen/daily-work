@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.7
+// @version      0.8
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -277,9 +277,13 @@
         if (!path) {
             return;
         }
+        const dal = new ReceptionVisitDAL();
         const staff = await getCachedWorkPersonList();
-        const records = await cc.readRecords(path);
-        for (let r of records) {
+        const records = [];
+        for (let r of await cc.readRecords(path)) {
+            if (dal.has(r.hash)) {
+                continue;
+            }
             if (r.visitType in VISIT_TYPES === false) {
                 throw new Error(`invalid visitType ${r.visitType}`);
             }
@@ -288,6 +292,11 @@
             }
             r.visitType = VISIT_TYPES[r.visitType];
             r.visitTime = moment(r.visitTime, "YYYY/MM/DD hh:mm");
+            // ignore records that happen later than today
+            if (!r.visitTime.isBefore(new Date(), 'day')) {
+                continue;
+            }
+            records.push(r);
         }
 
         const deptId = Cookie.getItem('dept');
@@ -310,7 +319,53 @@
                 visitType: r.visitType
             })
             console.log(`added visit record: ${r.personName}`);
-            await cc.delay(100);
+            dal.add(r.hash);
+            dal.save();
+            // vary the recording time
+            await cc.delay(((Math.random() * 9 | 0) * 5 + 45) * 1000);
+        }
+        if (records.length) {
+            alert('finish adding reception visit records');
+        }
+    }
+
+    class ReceptionVisitDAL {
+        static _KEY = "reception_visit";
+
+        constructor() {
+            this.init();
+        }
+
+        init() {
+            this._state = JSON.parse(localStorage.getItem(ReceptionVisitDAL._KEY)) || ReceptionVisitDAL._default();
+            const today = new Date();
+            // data has expired, clear all
+            // only one month worth of records are saved
+            if (this._state.lastUpdateTime.getYear() !== today.getYear() ||
+                this._state.lastUpdateTime.getMonth() !== today.getMonth()) {
+                this._state = ReceptionVisitDAL._default();
+                tihs.save();
+            }
+        }
+
+        static _default() {
+            return { lastUpdateTime: new Date(), data: {} };
+        }
+
+        add(id) {
+            if (this.has(id)) {
+                throw new Error('duplicate id');
+            }
+            this._state.data[id] = 1;
+            this._state.lastUpdateTime = new Date();
+        }
+
+        has(id) {
+            return id in this._state.data;
+        }
+
+        save() {
+            localStorage.setItem(ReceptionVisitDAL._KEY, JSON.stringify(this._state));
         }
     }
 
