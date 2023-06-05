@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.9
+// @version      0.10
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -323,7 +323,7 @@
             dal.add(r.hash);
             dal.save();
             // vary the recording time
-            await cc.delay(((Math.random() * 9 | 0) * 5 + 45) * 1000);
+            await cc.delay(((Math.random() * 5 | 0) * 2 + 10) * 1000);
         }
         if (records.length) {
             alert('finish adding reception visit records');
