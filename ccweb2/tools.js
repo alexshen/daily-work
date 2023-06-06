@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.10
+// @version      0.11
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -340,18 +340,19 @@
 
         init() {
             this._state = JSON.parse(localStorage.getItem(ReceptionVisitDAL._KEY)) || ReceptionVisitDAL._default();
-            const today = new Date();
+            this._state.lastUpdateTime = moment(this._state.lastUpdateTime);
+            const now = moment();
             // data has expired, clear all
             // only one month worth of records are saved
-            if (this._state.lastUpdateTime.getYear() !== today.getYear() ||
-                this._state.lastUpdateTime.getMonth() !== today.getMonth()) {
+            if (this._state.lastUpdateTime.year() !== today.year() ||
+                this._state.lastUpdateTime.month() !== today.month()) {
                 this._state = ReceptionVisitDAL._default();
                 tihs.save();
             }
         }
 
         static _default() {
-            return { lastUpdateTime: new Date(), data: {} };
+            return { lastUpdateTime: moment(), data: {} };
         }
 
         add(id) {
@@ -359,7 +360,7 @@
                 throw new Error('duplicate id');
             }
             this._state.data[id] = 1;
-            this._state.lastUpdateTime = new Date();
+            this._state.lastUpdateTime = moment();
         }
 
         has(id) {
