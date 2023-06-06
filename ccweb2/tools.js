@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.11
+// @version      0.12
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -320,7 +320,7 @@
                 visitTime: r.visitTime,
                 visitType: r.visitType
             })
-            console.log(`[${i+1}/${records.length}] added visit record: ${JSON.stringify(r)}`);
+            console.log(`[${i+1}/${records.length}] added visit record: ${JSON.stringify(_.omit(r, 'hash'))}`);
             dal.add(r.hash);
             dal.save();
             // vary the recording time
