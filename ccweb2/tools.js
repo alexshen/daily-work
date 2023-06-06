@@ -301,7 +301,8 @@
         }
 
         const deptId = Cookie.getItem('dept');
-        for (let r of records) {
+        for (let i = 0; i < records.length; ++i) {
+            const r = records[i];
             const results = await queryPersonList({personName: r.personName, jwId: deptId});
             if (results.length === 0) {
                 console.warn(`invalid person name: ${r.personName}`);
@@ -319,7 +320,7 @@
                 visitTime: r.visitTime,
                 visitType: r.visitType
             })
-            console.log(`added visit record: ${r.personName}`);
+            console.log(`[${i+1}/${records.length}] added visit record: ${JSON.stringify(r)}`);
             dal.add(r.hash);
             dal.save();
             // vary the recording time
