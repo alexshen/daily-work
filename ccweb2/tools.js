@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.13
+// @version      0.14
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -350,8 +350,8 @@
             const now = moment();
             // data has expired, clear all
             // only one month worth of records are saved
-            if (this._state.lastUpdateTime.year() !== today.year() ||
-                this._state.lastUpdateTime.month() !== today.month()) {
+            if (this._state.lastUpdateTime.year() !== now.year() ||
+                this._state.lastUpdateTime.month() !== now.month()) {
                 this._state = ReceptionVisitDAL._default();
                 tihs.save();
             }
