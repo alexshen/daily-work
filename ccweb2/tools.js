@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.17
+// @version      0.18
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -290,8 +290,8 @@
             }
             r.visitType = VISIT_TYPES[r.visitType];
             r.visitTime = moment(r.visitTime, "YYYY/MM/DD hh:mm");
-            // ignore records that happen later than today
-            if (!r.visitTime.isBefore(new Date(), 'day')) {
+            // ignore records that happen later now
+            if (!r.visitTime.isBefore(moment())) {
                 continue;
             }
             r.hash = CryptoJS.MD5(JSON.stringify(_.pick(r, RECEPTION_RECORD_FIELDS))).toString();
