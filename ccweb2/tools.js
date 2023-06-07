@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.12
+// @version      0.13
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -308,14 +308,20 @@
                 console.warn(`invalid person name: ${r.personName}`);
                 continue;
             }
+            // find the person with the specified address
+            const person = results.find(e => e.address.replace('|', '') === r.address);
+            if (!person) {
+                console.warn(`cannot find person: ${JSON.stringify(r)}`);
+                continue;
+            }
             await addReceptionVisitRecord({
-                address: results[0].address.replace('|', ' '),
+                address: person.address.replace('|', ' '),
                 joinUser: r.joinUser,
                 joinUserId: staff[r.joinUser],
                 jwId: deptId,
-                personId: results[0].personId,
-                personName: results[0].name,
-                relId: results[0].relId,
+                personId: person.personId,
+                personName: person.name,
+                relId: person.relId,
                 visitContent: r.visitContent,
                 visitTime: r.visitTime,
                 visitType: r.visitType
