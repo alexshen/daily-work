@@ -329,7 +329,7 @@
                 visitTime: r.visitTime,
                 visitType: r.visitType
             })
-            console.log(`[${i+1}/${records.length}] added visit record: ${JSON.stringify(_.omit(r, 'hash'))}`);
+            console.log(`[${i+1}/${records.length}] added visit record: ${JSON.stringify(_.pick(r, RECEPTION_RECORD_FIELDS))}`);
             dal.add(r.hash);
             dal.save();
             // vary the recording time
