@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.14
+// @version      0.15
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -293,7 +293,7 @@
             if (!r.visitTime.isBefore(new Date(), 'day')) {
                 continue;
             }
-            r.hash = CryptoJS.MD5(JSON.stringify(r));
+            r.hash = CryptoJS.MD5(JSON.stringify(r)).toString();
             if (dal.has(r.hash)) {
                 continue;
             }
@@ -308,8 +308,10 @@
                 console.warn(`invalid person name: ${r.personName}`);
                 continue;
             }
-            // find the person with the specified address
-            const person = results.find(e => e.address.replace('|', '') === r.address);
+            // find the person with the specified address if there are more than one people with the same name
+            const person = result.length > 1 
+                                ?  results.find(e => e.address.replace('|', '') === r.address) 
+                                : results[0];
             if (!person) {
                 console.warn(`cannot find person: ${JSON.stringify(r)}`);
                 continue;
