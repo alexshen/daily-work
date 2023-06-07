@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.18
+// @version      0.19
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -311,14 +311,14 @@
             }
             // find the person with the specified address if there are more than one people with the same name
             const person = results.length > 1 
-                                ?  results.find(e => e.address.replace('|', '') === r.address) 
+                                ?  results.find(e => e.address.replaceAll('|', '') === r.address) 
                                 : results[0];
             if (!person) {
                 console.warn(`cannot find person: ${JSON.stringify(r)}`);
                 continue;
             }
             await addReceptionVisitRecord({
-                address: person.address.replace('|', ' '),
+                address: person.address.replaceAll('|', ' '),
                 joinUser: r.joinUser,
                 joinUserId: staff[r.joinUser],
                 jwId: deptId,
