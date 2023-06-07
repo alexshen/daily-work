@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.15
+// @version      0.16
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -272,6 +272,7 @@
         '楼宇视频': "5",
         '其他': "6",
     };
+    const RECEPTION_RECORD_FIELDS = [ 'personName', 'visitType', 'visitTime', 'visitContent', 'joinUser' ];
     async function cmdAddReceptionVisitRecord() {
         const path = await cc.selectFile();
         if (!path) {
@@ -293,7 +294,7 @@
             if (!r.visitTime.isBefore(new Date(), 'day')) {
                 continue;
             }
-            r.hash = CryptoJS.MD5(JSON.stringify(r)).toString();
+            r.hash = CryptoJS.MD5(JSON.stringify(_.pick(r, RECEPTION_RECORD_FIELDS))).toString();
             if (dal.has(r.hash)) {
                 continue;
             }
