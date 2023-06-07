@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.16
+// @version      0.17
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -310,7 +310,7 @@
                 continue;
             }
             // find the person with the specified address if there are more than one people with the same name
-            const person = result.length > 1 
+            const person = results.length > 1 
                                 ?  results.find(e => e.address.replace('|', '') === r.address) 
                                 : results[0];
             if (!person) {
