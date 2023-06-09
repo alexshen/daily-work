@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.21
+// @version      0.22
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -282,6 +282,10 @@
         const staff = await getCachedWorkPersonList();
         const records = [];
         for (let r of await cc.readRecords(path)) {
+            r.hash = CryptoJS.MD5(JSON.stringify(_.pick(r, RECEPTION_RECORD_FIELDS))).toString();
+            if (dal.has(r.hash)) {
+                continue;
+            }
             if (r.visitType in VISIT_TYPES === false) {
                 throw new Error(`invalid visitType ${r.visitType}`);
             }
@@ -294,10 +298,6 @@
             r.visitTime = moment(r.visitTime, "YYYY/MM/DD hh:mm");
             // ignore records that happen later now
             if (!r.visitTime.isBefore(moment())) {
-                continue;
-            }
-            r.hash = CryptoJS.MD5(JSON.stringify(_.pick(r, RECEPTION_RECORD_FIELDS))).toString();
-            if (dal.has(r.hash)) {
                 continue;
             }
             records.push(r);
