@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.20
+// @version      0.21
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -285,8 +285,10 @@
             if (r.visitType in VISIT_TYPES === false) {
                 throw new Error(`invalid visitType ${r.visitType}`);
             }
-            if (r.joinUser in staff === false) {
-                throw new Error(`invalid joinUser ${r.joinUser}`);
+            r.joinUser = r.joinUser.split(',');
+            const invalidUsers = r.joinUser.filter(e => e in staff === false);
+            if (invalidUsers.length) {
+                throw new Error(`invalid joinUser ${invalidUsers}`);
             }
             r.visitType = VISIT_TYPES[r.visitType];
             r.visitTime = moment(r.visitTime, "YYYY/MM/DD hh:mm");
@@ -319,8 +321,8 @@
             }
             await addReceptionVisitRecord({
                 address: person.address.replaceAll('|', ' '),
-                joinUser: r.joinUser,
-                joinUserId: staff[r.joinUser],
+                joinUser: r.joinUser.join(','),
+                joinUserId: r.joinUser.map(e => staff[e]).join(','),
                 jwId: deptId,
                 personId: person.personId,
                 personName: person.name,
