@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.22
+// @version      0.23
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -282,7 +282,15 @@
         const staff = await getCachedWorkPersonList();
         const records = [];
         for (let r of await cc.readRecords(path)) {
-            r.hash = CryptoJS.MD5(JSON.stringify(_.pick(r, RECEPTION_RECORD_FIELDS))).toString();
+            // calculate a stable hash
+            r.hash = CryptoJS.MD5(
+                JSON.stringify(
+                    _.chain(r)
+                        .pick(RECEPTION_RECORD_FIELDS)
+                        .sortBy((e) => e[0])
+                        .value()
+                )
+            ).toString();
             if (dal.has(r.hash)) {
                 continue;
             }
