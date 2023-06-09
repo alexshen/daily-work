@@ -217,7 +217,10 @@ window.cc = (function() {
                 break;
             }
             // strip the surrounding double quotes if any
-            records.push(objectFromKeyValueArrays(fieldNames, line.split(sep).map(e => /"?(.+)"?/.exec(e)[1])));
+            records.push(objectFromKeyValueArrays(fieldNames, line.split(sep).map(e => {
+                // assuming there are no internal double quotes
+                return e[0] === '"' ? e.substring(1, e.length - 1) : e;
+            })));
         }
         return records;
     }
