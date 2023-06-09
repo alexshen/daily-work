@@ -216,7 +216,8 @@ window.cc = (function() {
             if (line.length === 0) {
                 break;
             }
-            records.push(objectFromKeyValueArrays(fieldNames, line.split(sep)));
+            // strip the surrounding double quotes if any
+            records.push(objectFromKeyValueArrays(fieldNames, line.split(sep).map(e => /"?(.+)"?/.exec(e)[1])));
         }
         return records;
     }
