@@ -336,7 +336,7 @@ window.cc = (function() {
         input.onchange = e => {
             files = e.target.files;
         };
-        input.click();
+        input.dispatchEvent(new MouseEvent('click'));
         while (!files) {
             await cc.delay(100);
         }
