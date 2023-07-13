@@ -336,7 +336,11 @@ window.cc = (function() {
         input.onchange = e => {
             files = e.target.files;
         };
-        input.dispatchEvent(new MouseEvent('click'));
+        function showFileDialog() {
+            input.click();
+            document.body.removeEventListener('click', showFileDialog);
+        }
+        document.body.addEventListener('click', showFileDialog);
         while (!files) {
             await cc.delay(100);
         }
