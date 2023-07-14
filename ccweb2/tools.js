@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.23
+// @version      0.24
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -317,6 +317,10 @@
             const results = await queryPersonList({personName: r.personName, jwId: deptId});
             if (results.length === 0) {
                 console.warn(`invalid person name: ${r.personName}`);
+                continue;
+            }
+            if (results.length > 1 && !r.address.length) {
+                console.warn(`non-unique name ${r.personName}, specify an address to disambiguate`);
                 continue;
             }
             // find the person with the specified address if there are more than one people with the same name
