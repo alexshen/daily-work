@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.24
+// @version      0.25
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -331,6 +331,10 @@
                 console.warn(`cannot find person: ${JSON.stringify(r)}`);
                 continue;
             }
+            if (i > 0) {
+                // vary the recording time
+                await cc.delay(((Math.random() * 5 | 0) * 2 + 10) * 1000);
+            }
             await addReceptionVisitRecord({
                 address: person.address.replaceAll('|', ' '),
                 joinUser: r.joinUser.join(','),
@@ -346,8 +350,6 @@
             console.log(`[${i+1}/${records.length}] added visit record: ${JSON.stringify(_.pick(r, RECEPTION_RECORD_FIELDS))}`);
             dal.add(r.hash);
             dal.save();
-            // vary the recording time
-            await cc.delay(((Math.random() * 5 | 0) * 2 + 10) * 1000);
         }
         if (records.length) {
             alert('finish adding reception visit records');
