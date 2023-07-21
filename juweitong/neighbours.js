@@ -3,14 +3,13 @@
 // ==UserScript==
 // @name    Neighbour Functions
 // @author  ashen
-// @version 0.18
+// @version 0.19
 // @grant   GM_registerMenuCommand
 // @match https://www.juweitong.cn/neighbour/*
-// @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/common.js
-// @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb/utils.js
+// @require https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
 // ==/UserScript==
 
-/* global cc, ccu, GM_registerMenuCommand */
+/* global cc, GM_registerMenuCommand */
 
 async function get(urlOrString, params, headers, respType) {
     headers = headers || {};
@@ -205,7 +204,7 @@ window.addEventListener('load', () => {
     });
 
     GM_registerMenuCommand("Activate Members", async () => {
-        const fname = await ccu.selectFile();
+        const fname = await cc.selectFile();
         if (!fname) {
             return;
         }
@@ -219,7 +218,7 @@ window.addEventListener('load', () => {
     });
 
     GM_registerMenuCommand("Deactivate Members", async () => {
-        const fname = await ccu.selectFile();
+        const fname = await cc.selectFile();
         if (!fname) {
             return;
         }
@@ -233,7 +232,7 @@ window.addEventListener('load', () => {
     });
 
     GM_registerMenuCommand("Remove Members", async () => {
-        const fname = await ccu.selectFile();
+        const fname = await cc.selectFile();
         if (!fname) {
             return;
         }
