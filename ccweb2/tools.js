@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.25
+// @version      0.26
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
@@ -372,7 +372,7 @@
             if (this._state.lastUpdateTime.year() !== now.year() ||
                 this._state.lastUpdateTime.month() !== now.month()) {
                 this._state = ReceptionVisitDAL._default();
-                tihs.save();
+                this.save();
             }
         }
 
