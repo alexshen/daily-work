@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.26
+// @version      0.27
 // @description  Tools for cc web 2
 // @author       ashen
-// @match        https://sqyjshd.mzj.sh.gov.cn/sqy-web/*
+// @match        https://jczl.sh.cegn.cn/web/*
 // @require      https://raw.githubusercontent.com/alexshen/daily-work/main/ccweb2/common.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js
