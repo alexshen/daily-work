@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.27
+// @version      0.28
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -333,7 +333,7 @@
             }
             if (i > 0) {
                 // vary the recording time
-                await cc.delay(((Math.random() * 5 | 0) * 2 + 10) * 1000);
+                await cc.delay(((Math.random() * 5 | 0) * 2) * 1000);
             }
             await addReceptionVisitRecord({
                 address: person.address.replaceAll('|', ' '),
