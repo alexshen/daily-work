@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.29
+// @version      0.30
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -137,6 +137,8 @@
             { name: "在住", key: "liveStatus" },
             { name: "人员类型", key: "personType" },
             { name: "社区标识", key: "tags" },
+            { name: "紧急联系人", key: "emergencyContact" },
+            { name: "紧急联系电话", key: "emergencyPhone" },
         ]);
         const records = [csvConv.headers];
         for (let curPage = 0; ; ++curPage) {
