@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.30
+// @version      0.31
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -122,6 +122,20 @@
         return await doRequest(url, 'GET', null, _.defaults(params, {
             size: 10, sort: 'HOUSE_ID,desc', isVirtual: 0, isHisList: 0
         }));
+    }
+
+    /**
+     * 
+     * @param {Object} params - query parameters 
+     * @param {string} params.deptId - department id
+     * @param {number} [params.topAddress]
+     * @param {number} [params.isVirtual]
+     * @param {string} [params.pid] - parent node id
+     * @param {string} [params.luId] - street id
+     */
+    async function queryAddressTree(params) {
+        const url = new URL('/sqy-admin/api/sqAddress/getAddressTree', document.location.origin);
+        return await doRequest(url, 'GET', null, params);
     }
 
     async function dumpResidents() {
@@ -400,6 +414,31 @@
         }
     }
 
+    async function cmdDumpAddresses() {
+        const deptId = Cookie.getItem("dept");
+        // last node is not our concern
+        const csvConv = new cc.CSVRecordConverter([
+            { name: "地址", key: "address" },
+            { name: "id", key: "id" },
+        ]);
+        const records = [csvConv.headers];
+        const streets = _.initial(await queryAddressTree({ deptId, topAddress: 1 }));
+        for (const street of streets) {
+            const compounds = await queryAddressTree({ deptId, pid: street.id, luId: street.id, isVirtual: 0 });
+            for (const compound of compounds) {
+                const units = await queryAddressTree({ deptId, pid: compound.id, nongId: compound.id, luId: street.id, isVirtual: 0});
+                for (const unit of units) {
+                    const rooms = await queryAddressTree({ deptId, pid: unit.id, haoId: unit.id, nongId: compound.id, luId: street.id, isVirtual: 0});
+                    for (const room of rooms) {
+                        records.push(csvConv.convertToArray({ address: room.address, id: room.id }));
+                    }
+                }
+            }
+        }
+        const text = records.map(e => e.join('\t')).join('\n');
+        console.log(text);
+    }
+
     window.addEventListener('load', () => {
         GM_registerMenuCommand('Dump Residents', () => {
             dumpResidents();
@@ -411,6 +450,10 @@
 
         GM_registerMenuCommand('Add Visit Record', () => {
             cmdAddReceptionVisitRecord();
+        });
+
+        GM_registerMenuCommand('Dump Addresses', () => {
+            cmdDumpAddresses();
         });
 
         // heartbeat
