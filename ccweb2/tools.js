@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.31
+// @version      0.32
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -13,7 +13,7 @@
 // ==/UserScript==
 
 /* global cc */
-/* global GM_registerMenuCommand, JSEncrypt */
+/* global GM_registerMenuCommand, JSEncrypt, _ */
 
 (function () {
     "use strict";
@@ -136,6 +136,11 @@
     async function queryAddressTree(params) {
         const url = new URL('/sqy-admin/api/sqAddress/getAddressTree', document.location.origin);
         return await doRequest(url, 'GET', null, params);
+    }
+
+    async function queryHouseTag(roomId) {
+        const url = new URL('/sqy-admin/api/sqTagRecord/queryHouseTag/' + roomId, document.location.origin);
+        return await doRequest(url, 'GET', null);
     }
 
     async function dumpResidents() {
@@ -414,26 +419,89 @@
         }
     }
 
-    async function cmdDumpAddresses() {
+    async function listAddresses() {
+        const results = [];
         const deptId = Cookie.getItem("dept");
+        // last node is not our concern
+        const streets = _.initial(await queryAddressTree({ deptId, topAddress: 1 }));
+        for (const street of streets) {
+            const compounds = await queryAddressTree({
+                deptId,
+                pid: street.id,
+                luId: street.id,
+                isVirtual: 0,
+            });
+            for (const compound of compounds) {
+                const units = await queryAddressTree({
+                    deptId,
+                    pid: compound.id,
+                    nongId: compound.id,
+                    luId: street.id,
+                    isVirtual: 0,
+                });
+                for (const unit of units) {
+                    const rooms = await queryAddressTree({
+                        deptId,
+                        pid: unit.id,
+                        haoId: unit.id,
+                        nongId: compound.id,
+                        luId: street.id,
+                        isVirtual: 0,
+                    });
+                    for (const room of rooms) {
+                        results.push({ address: room.address, id: room.id });
+                    }
+                }
+            }
+        }
+        return results;
+    }
+
+    const ADDRESSES_KEY = "addresses";
+    async function getAddresses() {
+        let addresses;
+        if (!localStorage.getItem(ADDRESSES_KEY)) {
+            addresses = await listAddresses();
+            updateAddresses(addresses);
+        } else {
+            addresses = JSON.parse(localStorage.getItem(ADDRESSES_KEY));
+        }
+        return addresses;
+    }
+
+    function updateAddresses(addresses) {
+        localStorage.setItem(ADDRESSES_KEY, JSON.stringify(addresses));
+        console.log('updated address cache');
+    }
+
+    async function cmdDumpAddresses() {
         // last node is not our concern
         const csvConv = new cc.CSVRecordConverter([
             { name: "地址", key: "address" },
             { name: "id", key: "id" },
         ]);
         const records = [csvConv.headers];
-        const streets = _.initial(await queryAddressTree({ deptId, topAddress: 1 }));
-        for (const street of streets) {
-            const compounds = await queryAddressTree({ deptId, pid: street.id, luId: street.id, isVirtual: 0 });
-            for (const compound of compounds) {
-                const units = await queryAddressTree({ deptId, pid: compound.id, nongId: compound.id, luId: street.id, isVirtual: 0});
-                for (const unit of units) {
-                    const rooms = await queryAddressTree({ deptId, pid: unit.id, haoId: unit.id, nongId: compound.id, luId: street.id, isVirtual: 0});
-                    for (const room of rooms) {
-                        records.push(csvConv.convertToArray({ address: room.address, id: room.id }));
-                    }
-                }
+        const addresses = await listAddresses();
+        updateAddresses(addresses);
+        for await (const room of addresses) {
+            records.push(csvConv.convertToArray({ address: room.address, id: room.id }));
+        }
+        const text = records.map(e => e.join('\t')).join('\n');
+        console.log(text);
+    }
+
+    async function cmdDumpRoomTags() {
+        const csvConv = new cc.CSVRecordConverter([
+            { name: "地址", key: "address" },
+            { name: "标签", key: "tags" },
+        ]);
+        const records = [csvConv.headers];
+        for (const room of await getAddresses()) {
+            const tags = []
+            for (const tag of await queryHouseTag(room.id)) {
+                tags.push(tag.tagName);
             }
+            records.push(csvConv.convertToArray({ address: room.address, tags: tags.join(',') }));
         }
         const text = records.map(e => e.join('\t')).join('\n');
         console.log(text);
@@ -454,6 +522,10 @@
 
         GM_registerMenuCommand('Dump Addresses', () => {
             cmdDumpAddresses();
+        });
+
+        GM_registerMenuCommand('Dump Room Tags', () => {
+            cmdDumpRoomTags();
         });
 
         // heartbeat
