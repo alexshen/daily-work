@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.32
+// @version      0.33
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -143,7 +143,7 @@
         return await doRequest(url, 'GET', null);
     }
 
-    async function dumpResidents() {
+    async function cmdDumpResidents() {
         const deptId = Cookie.getItem("dept");
         const csvConv = new cc.CSVRecordConverter([
             { name: "UUID", key: "personId" },
@@ -509,7 +509,7 @@
 
     window.addEventListener('load', () => {
         GM_registerMenuCommand('Dump Residents', () => {
-            dumpResidents();
+            cmdDumpResidents();
         });
 
         GM_registerMenuCommand('Print RSA Public Key', () => {
