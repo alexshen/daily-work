@@ -236,7 +236,7 @@
      * @param {string} params.size - defaults to 20
      */
     async function queryPersonList(params) {
-        const url = new URL('/sqyjshd-admin/api/sqReceptionVisit/queryPersonList', document.location.origin);
+        const url = new URL('/sqy-admin/api/sqReceptionVisit/queryPersonList', document.location.origin);
         return await doRequest(url, "GET", null, _.defaults(params, { page: 0, size: 20 }));
     }
 
@@ -246,7 +246,7 @@
      * @param {string} params.jwId
      */
     async function getWorkPersonList(params) {
-        const url = new URL('/sqyjshd-admin/api/sqReceptionVisit/getWorkPersonList', document.location.origin);
+        const url = new URL('/sqy-admin/api/sqReceptionVisit/getWorkPersonList', document.location.origin);
         return await doRequest(url, "GET", null, params);
     }
 
@@ -280,7 +280,7 @@
      * @param {string} params.visitImg - defaults to null
      */
     async function addReceptionVisitRecord(params) {
-        const url = new URL('/sqyjshd-admin/api/sqReceptionVisit', document.location.origin);
+        const url = new URL('/sqy-admin/api/sqReceptionVisit', document.location.origin);
         return await doRequest(url, "POST", null, null, 
             _.defaults(params, { 
                 isSync: false, opTime: null, recorder: null, userId: null,
