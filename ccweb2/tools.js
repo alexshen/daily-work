@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.37
+// @version      0.38
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -158,6 +158,7 @@
             { name: "社区标识", key: "tags" },
             { name: "紧急联系人", key: "emergencyContact" },
             { name: "紧急联系电话", key: "emergencyPhone" },
+            { name: "备注", key: "remark" },
         ]);
         const records = [csvConv.headers];
         for (let curPage = 0; ; ++curPage) {
@@ -178,7 +179,7 @@
                 );
                 const personInfo = _.chain(resp)
                     .pick(["name", "phone", "cardNo", "hjdz", "personId", "personType", 
-                           "relId", "liveStatus", "emergencyContact", "emergencyPhone"])
+                           "relId", "liveStatus", "emergencyContact", "emergencyPhone", "remark"])
                     .merge(_.pick(basicPersonInfo, "jzdz"))
                     .update('hjdz', clean)
                     .value();
