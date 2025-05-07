@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.38
+// @version      0.39
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -183,7 +183,7 @@
                     .merge(_.pick(basicPersonInfo, "jzdz"))
                     .update('hjdz', clean)
                     .value();
-                personInfo.tags = _.chain(resp.tagList).uniqBy(['tagName']).sortBy(['tagName']).map('tagName').join(',').value();
+                personInfo.tags = _.chain(resp.tagList).uniqBy('tagName').sortBy(['tagName']).map('tagName').join(',').value();
                 return csvConv.convertToArray(personInfo);
             }, 10, async () => await cc.delay(100)));
         }
