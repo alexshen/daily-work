@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.39
+// @version      0.40
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -165,6 +165,7 @@
             const result = await listResidents({
                 page: curPage,
                 deptId: deptId,
+                queryScopeDeptId: deptId,
                 size: 30
             });
             if (result.content.length === 0) {
