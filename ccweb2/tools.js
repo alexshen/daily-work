@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.40
+// @version      0.41
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -91,8 +91,8 @@
         enc.setPublicKey(g_state.rsaPublicKey);
         const key = cc.randomString(AES_KEY_SEED, 16)
         const iv = cc.randomString(AES_KEY_SEED, 16);
-        headers['AES-KEY'] = enc.encrypt(key);
-        headers['AES-IV'] = enc.encrypt(iv);
+        headers['Aes-Key'] = enc.encrypt(key);
+        headers['Aes-Iv'] = enc.encrypt(iv);
         headers['Authorization'] = Cookie.getItem('SQY-ADMIN-TOKEN');
         headers['Content-Type'] = 'application/json';
 
