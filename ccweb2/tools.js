@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.41
+// @version      0.42
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -153,9 +153,11 @@
             { name: "户籍地址", key: "hjdz" },
             { name: "居住ID", key: "relId" },
             { name: "居住地址", key: "jzdz" },
+            { name: "房屋ID", key: "houseId" },
             { name: "在住", key: "liveStatus" },
             { name: "人员类型", key: "personType" },
             { name: "社区标识", key: "tags" },
+            { name: "实口", key: "registeredPopulation" },
             { name: "紧急联系人", key: "emergencyContact" },
             { name: "紧急联系电话", key: "emergencyPhone" },
             { name: "备注", key: "remark" },
@@ -185,6 +187,8 @@
                     .update('hjdz', clean)
                     .value();
                 personInfo.tags = _.chain(resp.tagList).uniqBy('tagName').sortBy(['tagName']).map('tagName').join(',').value();
+                personInfo.houseId = resp.houseId;
+                personInfo.registeredPopulation = resp.skbz === "1";
                 return csvConv.convertToArray(personInfo);
             }, 10, async () => await cc.delay(100)));
         }
