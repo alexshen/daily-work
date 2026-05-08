@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.42
+// @version      0.43
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -143,6 +143,8 @@
         return await doRequest(url, 'GET', null);
     }
 
+    const KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE = "cmd/dumpResidents/page";
+
     async function cmdDumpResidents() {
         const deptId = Cookie.getItem("dept");
         const csvConv = new cc.CSVRecordConverter([
@@ -163,39 +165,49 @@
             { name: "备注", key: "remark" },
         ]);
         const records = [csvConv.headers];
-        for (let curPage = 0; ; ++curPage) {
-            const result = await listResidents({
-                page: curPage,
-                deptId: deptId,
-                queryScopeDeptId: deptId,
-                size: 30
-            });
-            if (result.content.length === 0) {
-                break;
+        try {
+            let curPage = Number(localStorage.getItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE) || 0);
+            if (curPage > 0) {
+                console.log(`resume dumping from page ${curPage}`);
             }
-            records.push(...await cc.slicedMap(result.content, async basicPersonInfo => {
-                const resp = await queryPersonInfo(
-                    _.chain(basicPersonInfo)
-                        .pick(["relId", "personId", "houseId", "jwId"])
-                        .set("deptId", deptId)
-                        .value()
-                );
-                const personInfo = _.chain(resp)
-                    .pick(["name", "phone", "cardNo", "hjdz", "personId", "personType", 
-                           "relId", "liveStatus", "emergencyContact", "emergencyPhone", "remark"])
-                    .merge(_.pick(basicPersonInfo, "jzdz"))
-                    .update('hjdz', clean)
-                    .value();
-                personInfo.tags = _.chain(resp.tagList).uniqBy('tagName').sortBy(['tagName']).map('tagName').join(',').value();
-                personInfo.houseId = resp.houseId;
-                personInfo.registeredPopulation = resp.skbz === "1";
-                return csvConv.convertToArray(personInfo);
-            }, 10, async () => await cc.delay(100)));
+            for (; ; ++curPage) {
+                const result = await listResidents({
+                    page: curPage,
+                    deptId: deptId,
+                    queryScopeDeptId: deptId,
+                    size: 30
+                });
+                if (result.content.length === 0) {
+                    break;
+                }
+                records.push(...await cc.slicedMap(result.content, async basicPersonInfo => {
+                    const resp = await queryPersonInfo(
+                        _.chain(basicPersonInfo)
+                            .pick(["relId", "personId", "houseId", "jwId"])
+                            .set("deptId", deptId)
+                            .value()
+                    );
+                    const personInfo = _.chain(resp)
+                        .pick(["name", "phone", "cardNo", "hjdz", "personId", "personType", 
+                            "relId", "liveStatus", "emergencyContact", "emergencyPhone", "remark"])
+                        .merge(_.pick(basicPersonInfo, "jzdz"))
+                        .update('hjdz', clean)
+                        .value();
+                    personInfo.tags = _.chain(resp.tagList).uniqBy('tagName').sortBy(['tagName']).map('tagName').join(',').value();
+                    personInfo.houseId = resp.houseId;
+                    personInfo.registeredPopulation = resp.skbz === "1";
+                    return csvConv.convertToArray(personInfo);
+                }, 10, async () => await cc.delay(100)));
+                localStorage.setItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE, curPage + 1);
+            }
+            localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
+        } catch (e) {
+            console.error(e);
+            // do nothing
         }
         const text = records.map(e => e.join('\t')).join('\n');
         console.log(text);
         await navigator.clipboard.writeText(text);
-        alert("Residents have been copied to the clipboard.");
 
         function clean(s) {
             return s ? s.trim().replace(/\r\n|\r|\n/, ' ') : s;
