@@ -153,8 +153,21 @@ def main(input_files: List[str], password: str, output_path: str):
         return
 
     df = pd.DataFrame(all_records)
-    df.to_excel(output_path, index=False)
-    print(f"\n处理完成！共输出 {len(all_records)} 条记录，保存至 {output_path}")
+    
+    # 直接使用 xlsxwriter 设置列格式
+    with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
+        df.to_excel(writer, sheet_name='探访记录', index=False)
+        workbook = writer.book
+        worksheet = writer.sheets['探访记录']
+        text_format = workbook.add_format({'num_format': '@'})
+        
+        # 查找身份证号列索引
+        for col_name in ["身份证号", "志愿者身份证号"]:
+            if col_name in df.columns:
+                col_idx = df.columns.get_loc(col_name)
+                worksheet.set_column(col_idx, col_idx, None, text_format)
+    
+    print(f"处理完成！共输出 {len(all_records)} 条记录，身份证号与志愿者身份证号已设为文本格式。")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="提取加密Excel中的探访记录")
