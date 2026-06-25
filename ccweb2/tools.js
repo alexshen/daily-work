@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.48
+// @version      0.49
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -791,7 +791,6 @@
         const buttons = [
             { label: '导出居民数据', action: cmdDumpResidents, id: 'export-residents-btn' },
             { label: '批量添加走访记录', action: cmdAddReceptionVisitRecord },
-            { label: '导出地址列表', action: cmdDumpAddresses },
             { label: '导出房屋标签', action: cmdDumpRoomTags }
         ];
 
