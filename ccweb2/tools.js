@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.46
+// @version      0.47
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -270,38 +270,53 @@
         ]);
 
         let records;
-        let nextPage = Number(localStorage.getItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE) || 0);
-        const dataStr = localStorage.getItem(KEY_RESIDENT_DATA);
+        let nextPage = 0;
         let errorOccurred = false;
 
-        // Resume from breakpoint if exists
-        if (nextPage > 0 && dataStr) {
-            showMessage('Detected breakpoint, restoring data...', false);
-            await cc.delay(500);
-            const lines = dataStr.split('\n');
-            records = lines.map(line => line.split('\t'));
-            console.log(`Resumed with ${records.length - 1} records, starting from page ${nextPage}`);
-        } else {
-            records = [csvConv.headers];
-            localStorage.removeItem(KEY_RESIDENT_DATA);
-            if (nextPage > 0) {
+        // 检查是否存在断点数据
+        const storedNextPage = localStorage.getItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
+        const storedData = localStorage.getItem(KEY_RESIDENT_DATA);
+
+        if (storedNextPage !== null && storedData !== null) {
+            // 询问用户是否恢复
+            const resume = confirm(
+                '检测到未完成的导出数据，是否继续恢复？\n点击“确定”恢复，点击“取消”重新开始。'
+            );
+            if (resume) {
+                // 恢复断点
+                nextPage = Number(storedNextPage);
+                const lines = storedData.split('\n');
+                records = lines.map(line => line.split('\t'));
+                console.log(`Resumed with ${records.length - 1} records, starting from page ${nextPage}`);
+                showMessage('正在恢复导出...', false);
+                await cc.delay(500);
+            } else {
+                // 重新开始，清除断点数据
                 localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
+                localStorage.removeItem(KEY_RESIDENT_DATA);
+                records = [csvConv.headers];
                 nextPage = 0;
             }
+        } else {
+            // 无断点，从头开始
+            records = [csvConv.headers];
+            nextPage = 0;
+            // 确保清除可能残留的旧数据（安全起见）
+            localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
+            localStorage.removeItem(KEY_RESIDENT_DATA);
         }
 
-        // Show persistent progress indicator
+        // 显示持久进度（稍后会在循环中更新）
         hideMessage();
-        showMessage('Exporting resident data, please wait... <span class="spinner"></span>', true);
+        showMessage('正在导出居民数据，请稍候... <span class="spinner"></span>', true);
 
         try {
             for (let curPage = nextPage; ; ++curPage) {
-                // Check for user abort
                 if (abortExportResidents) {
                     throw new Error('User cancelled');
                 }
 
-                updateMessage(`Exporting resident data (page ${curPage + 1})... <span class="spinner"></span>`);
+                updateMessage(`正在导出居民数据 (第 ${curPage + 1} 页)... <span class="spinner"></span>`);
 
                 const result = await listResidents({
                     page: curPage,
@@ -309,13 +324,13 @@
                     queryScopeDeptId: deptId,
                     size: 30
                 });
+
                 if (result.content.length === 0) {
-                    // No more data, clear breakpoint
+                    // 没有更多数据，清除断点
                     localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
                     break;
                 }
 
-                // Check abort before processing each page
                 if (abortExportResidents) {
                     throw new Error('User cancelled');
                 }
@@ -340,27 +355,26 @@
                 }, 10, async () => await cc.delay(100));
 
                 records.push(...convertedRows);
-                // Persist accumulated data (including header)
+                // 持久化
                 localStorage.setItem(KEY_RESIDENT_DATA, records.map(row => row.join('\t')).join('\n'));
-                // Save next page for breakpoint
                 localStorage.setItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE, curPage + 1);
             }
         } catch (e) {
             errorOccurred = true;
             hideMessage();
             if (e.message === 'User cancelled') {
-                showMessage('Export cancelled by user.', false);
-                // Keep cached data for resume
+                showMessage('导出已取消。', false);
+                // 保留断点缓存，以便后续恢复
             } else {
                 console.error(e);
-                alert('Export failed: ' + e.message);
-                // Keep cached data for retry
+                alert('导出失败：' + e.message);
+                // 保留断点缓存以便重试
             }
         } finally {
             isExportingResidents = false;
             abortExportResidents = false;
             if (!errorOccurred) {
-                // Successful completion
+                // 成功完成，清除断点并下载文件
                 hideMessage();
                 const text = records.map(e => e.join('\t')).join('\n');
                 const blob = new Blob([text], { type: 'text/tsv;charset=utf-8' });
@@ -373,7 +387,7 @@
                 URL.revokeObjectURL(link.href);
                 localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
                 localStorage.removeItem(KEY_RESIDENT_DATA);
-                alert('Export completed!');
+                alert('导出完成！');
             }
             updateExportButton();
         }
