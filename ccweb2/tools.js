@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.43
+// @version      0.44
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -526,6 +526,58 @@
         console.log(text);
     }
 
+    // 新增：创建右下角浮动按钮的函数
+    function createFloatingButtons() {
+        // 避免重复创建
+        if (document.getElementById('my-tools-buttons')) {
+            return;
+        }
+        const container = document.createElement('div');
+        container.id = 'my-tools-buttons';
+        container.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        `;
+        const buttons = [
+            { label: '导出居民数据', action: cmdDumpResidents },
+            { label: '批量添加走访记录', action: cmdAddReceptionVisitRecord },
+            { label: '导出地址列表', action: cmdDumpAddresses },
+            { label: '导出房屋标签', action: cmdDumpRoomTags }
+        ];
+        buttons.forEach(({label, action}) => {
+            const btn = document.createElement('button');
+            btn.textContent = label;
+            btn.style.cssText = `
+                padding: 8px 14px;
+                background: #409EFF;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 500;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                transition: background 0.2s;
+                white-space: nowrap;
+            `;
+            // 悬浮效果
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = '#66b1ff';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = '#409EFF';
+            });
+            btn.addEventListener('click', action);
+            container.appendChild(btn);
+        });
+        document.body.appendChild(container);
+    }
+
     window.addEventListener('load', () => {
         GM_registerMenuCommand('Dump Residents', () => {
             cmdDumpResidents();
@@ -554,6 +606,7 @@
                 queryCurrentDept({ deptId: deptId });
             }
         }, 60 * 1000);
+
+        createFloatingButtons();
     });
 })();
-
