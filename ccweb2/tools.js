@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.47
+// @version      0.48
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -180,6 +180,10 @@
                 border-top-color: #fff;
                 animation: spin 0.8s linear infinite;
             }
+            #my-tools-buttons button:disabled {
+                cursor: not-allowed;
+                color: #a8a8a8;
+            }
             @keyframes spin {
                 to { transform: rotate(360deg); }
             }
@@ -246,7 +250,20 @@
 
     async function cmdDumpResidents() {
         if (isExportingResidents) return;
+
+        // ---------- 断点检查与用户确认 ----------
+        let shouldResume = false;
+        const storedNextPage = localStorage.getItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
+        const storedData = localStorage.getItem(KEY_RESIDENT_DATA);
+        if (storedNextPage !== null && storedData !== null) {
+            shouldResume = confirm(
+                '检测到未完成的导出数据，是否继续恢复？\n点击“确定”恢复，点击“取消”重新开始。'
+            );
+        }
+
+        // ---------- 禁用所有按钮（导出按钮保留点击能力） ----------
         isExportingResidents = true;
+        setButtonsEnabled(false, 'export-residents-btn');
         abortExportResidents = false;
         updateExportButton();
 
@@ -270,51 +287,29 @@
         ]);
 
         let records;
-        let nextPage = 0;
+        let nextPage;
         let errorOccurred = false;
 
-        // 检查是否存在断点数据
-        const storedNextPage = localStorage.getItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
-        const storedData = localStorage.getItem(KEY_RESIDENT_DATA);
-
-        if (storedNextPage !== null && storedData !== null) {
-            // 询问用户是否恢复
-            const resume = confirm(
-                '检测到未完成的导出数据，是否继续恢复？\n点击“确定”恢复，点击“取消”重新开始。'
-            );
-            if (resume) {
-                // 恢复断点
-                nextPage = Number(storedNextPage);
-                const lines = storedData.split('\n');
-                records = lines.map(line => line.split('\t'));
-                console.log(`Resumed with ${records.length - 1} records, starting from page ${nextPage}`);
-                showMessage('正在恢复导出...', false);
-                await cc.delay(500);
-            } else {
-                // 重新开始，清除断点数据
-                localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
-                localStorage.removeItem(KEY_RESIDENT_DATA);
-                records = [csvConv.headers];
-                nextPage = 0;
-            }
+        if (shouldResume) {
+            nextPage = Number(storedNextPage);
+            const lines = storedData.split('\n');
+            records = lines.map(line => line.split('\t'));
+            console.log(`Resumed with ${records.length - 1} records, starting from page ${nextPage}`);
+            showMessage('正在恢复导出...', false);
+            await cc.delay(500);
         } else {
-            // 无断点，从头开始
-            records = [csvConv.headers];
-            nextPage = 0;
-            // 确保清除可能残留的旧数据（安全起见）
             localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
             localStorage.removeItem(KEY_RESIDENT_DATA);
+            records = [csvConv.headers];
+            nextPage = 0;
         }
 
-        // 显示持久进度（稍后会在循环中更新）
         hideMessage();
         showMessage('正在导出居民数据，请稍候... <span class="spinner"></span>', true);
 
         try {
             for (let curPage = nextPage; ; ++curPage) {
-                if (abortExportResidents) {
-                    throw new Error('User cancelled');
-                }
+                if (abortExportResidents) throw new Error('User cancelled');
 
                 updateMessage(`正在导出居民数据 (第 ${curPage + 1} 页)... <span class="spinner"></span>`);
 
@@ -331,9 +326,7 @@
                     break;
                 }
 
-                if (abortExportResidents) {
-                    throw new Error('User cancelled');
-                }
+                if (abortExportResidents) throw new Error('User cancelled');
 
                 const convertedRows = await cc.slicedMap(result.content, async basicPersonInfo => {
                     const resp = await queryPersonInfo(
@@ -373,6 +366,7 @@
         } finally {
             isExportingResidents = false;
             abortExportResidents = false;
+            setButtonsEnabled(true, null);
             if (!errorOccurred) {
                 // 成功完成，清除断点并下载文件
                 hideMessage();
@@ -499,9 +493,11 @@
     const RECEPTION_RECORD_FIELDS = [ 'personName', 'visitType', 'visitTime', 'visitContent', 'joinUser' ];
     
     async function cmdAddReceptionVisitRecord() {
-        showMessage('正在准备...', true);
-        const errors = []; // 收集失败记录
+        setButtonsEnabled(false, null);
+        const errors = [];
+        let successCount = 0;
         try {
+            showMessage('正在准备...', true);
             const path = await cc.selectFile();
             if (!path) {
                 hideMessage();
@@ -513,7 +509,6 @@
             const records = [];
 
             for (let r of await cc.readRecords(path)) {
-            // calculate a stable hash
                 r.hash = CryptoJS.MD5(
                     JSON.stringify(
                         _.chain(r)
@@ -544,14 +539,10 @@
             }
 
             const deptId = Cookie.getItem('dept');
-            let successCount = 0;
             for (let i = 0; i < records.length; ++i) {
-                // 更新进度
                 updateMessage(`正在添加走访记录 (${i+1}/${records.length}) ... <span class="spinner"></span>`);
-
                 const r = records[i];
                 try {
-                    // 1. 查询人员
                     const results = await queryPersonList({ personName: r.personName, jwId: deptId });
                     if (results.length === 0) {
                         errors.push({ personName: r.personName, address: r.address || '未提供', reason: '查无此人' });
@@ -582,12 +573,10 @@
                         visitType: r.visitType
                     });
 
-                    // 成功后才保存去重记录
                     dal.add(r.hash);
                     dal.save();
                     successCount++;
                     console.log(`[${i+1}/${records.length}] added: ${r.personName}`);
-
                 } catch (e) {
                     errors.push({
                         personName: r.personName,
@@ -595,20 +584,16 @@
                         reason: e.message || '未知错误'
                     });
                 }
-
-                // 随机延迟
                 if (i < records.length - 1) {
                     await cc.delay(((Math.random() * 5 | 0) * 2) * 1000);
                 }
             }
 
             hideMessage();
-
             if (successCount > 0) {
                 showMessage(`成功添加 ${successCount} 条记录`, false);
                 alert(`完成添加，成功 ${successCount} 条`);
             }
-
             if (errors.length > 0) {
                 const errorLines = errors.map(e =>
                     `姓名：${e.personName}，地址：${e.address}，原因：${e.reason}`
@@ -616,11 +601,12 @@
                 const errorText = '以下记录添加失败：<br>' + errorLines.join('<br>');
                 showMessage(errorText, true, true);
             }
-
         } catch (e) {
             hideMessage();
             showMessage('添加失败：' + e.message, false);
             console.error(e);
+        } finally {
+            setButtonsEnabled(true, null);
         }
     }
 
@@ -721,38 +707,72 @@
     }
 
     async function cmdDumpAddresses() {
-        // last node is not our concern
-        const csvConv = new cc.CSVRecordConverter([
-            { name: "地址", key: "address" },
-            { name: "id", key: "id" },
-        ]);
-        const records = [csvConv.headers];
-        const addresses = await listAddresses();
-        updateAddresses(addresses);
-        for await (const room of addresses) {
-            records.push(csvConv.convertToArray({ address: room.address, id: room.id }));
+        setButtonsEnabled(false, null);
+        try {
+            const csvConv = new cc.CSVRecordConverter([
+                { name: "地址", key: "address" },
+                { name: "id", key: "id" },
+            ]);
+            const records = [csvConv.headers];
+            const addresses = await listAddresses();
+            updateAddresses(addresses);
+            for (const room of addresses) {
+                records.push(csvConv.convertToArray({ address: room.address, id: room.id }));
+            }
+            const text = records.map(e => e.join('\t')).join('\n');
+            // 下载文件（原只打印到控制台，现改为下载）
+            const blob = new Blob([text], { type: 'text/tsv;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `地址列表_${new Date().toISOString().slice(0,10)}.tsv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            alert('地址列表导出完成！');
+        } catch (e) {
+            console.error(e);
+            alert('导出地址失败：' + e.message);
+        } finally {
+            setButtonsEnabled(true, null);
         }
-        const text = records.map(e => e.join('\t')).join('\n');
-        console.log(text);
     }
 
     async function cmdDumpRoomTags() {
-        const csvConv = new cc.CSVRecordConverter([
-            { name: "地址", key: "address" },
-            { name: "标签", key: "tags" },
-        ]);
-        const records = [csvConv.headers];
-        for (const room of await getAddresses()) {
-            const tags = []
-            for (const tag of await queryHouseTag(room.id)) {
-                tags.push(tag.tagName);
+        setButtonsEnabled(false, null);
+        try {
+            const csvConv = new cc.CSVRecordConverter([
+                { name: "地址", key: "address" },
+                { name: "标签", key: "tags" },
+            ]);
+            const records = [csvConv.headers];
+            for (const room of await getAddresses()) {
+                const tags = [];
+                for (const tag of await queryHouseTag(room.id)) {
+                    tags.push(tag.tagName);
+                }
+                records.push(csvConv.convertToArray({ address: room.address, tags: tags.join(',') }));
             }
-            records.push(csvConv.convertToArray({ address: room.address, tags: tags.join(',') }));
+            const text = records.map(e => e.join('\t')).join('\n');
+            const blob = new Blob([text], { type: 'text/tsv;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `房屋标签_${new Date().toISOString().slice(0,10)}.tsv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            alert('房屋标签导出完成！');
+        } catch (e) {
+            console.error(e);
+            alert('导出房屋标签失败：' + e.message);
+        } finally {
+            setButtonsEnabled(true, null);
         }
-        const text = records.map(e => e.join('\t')).join('\n');
-        console.log(text);
     }
 
+    let g_allButtons = [];
+    
     function createFloatingButtons() {
         if (document.getElementById('my-tools-buttons')) return;
         const container = document.createElement('div');
@@ -821,10 +841,31 @@
                 btn.addEventListener('click', action);
             }
             container.appendChild(btn);
+            g_allButtons.push(btn);
         });
 
         document.body.appendChild(container);
         updateExportButton();
+    }
+    
+    function setButtonsEnabled(enabled, excludeId) {
+        g_allButtons.forEach(btn => {
+            if (excludeId && btn.id === excludeId) return;
+            btn.disabled = !enabled;
+            if (enabled) {
+                // 非导出按钮恢复默认背景
+                if (btn.id !== 'export-residents-btn') {
+                    btn.style.background = '#409EFF';
+                }
+                // 导出按钮背景由 updateExportButton 统一管理，此处不设置
+            } else {
+                btn.style.background = '#c0c4cc';
+            }
+        });
+        // 当启用所有按钮（无排除）时，刷新导出按钮状态
+        if (enabled && !excludeId) {
+            updateExportButton();
+        }
     }
 
     function updateExportButton() {
