@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.44
+// @version      0.45
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -143,9 +143,99 @@
         return await doRequest(url, 'GET', null);
     }
 
+    let isExportingResidents = false;
+    let abortExportResidents = false;
+    let exportResidentsBtn = null;
+
+    let messageTimeout = null;
+    let messageEl = null;
+    let styleInjected = false;
+
+    function injectMessageStyle() {
+        if (styleInjected) return;
+        const style = document.createElement('style');
+        style.textContent = `
+            #my-tools-message {
+                position: fixed;
+                bottom: 100px;
+                right: 20px;
+                z-index: 99999;
+                background: rgba(0,0,0,0.75);
+                color: #fff;
+                padding: 12px 20px;
+                border-radius: 4px;
+                font-size: 14px;
+                display: none;
+                align-items: center;
+                gap: 10px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            }
+            #my-tools-message .spinner {
+                display: inline-block;
+                width: 16px;
+                height: 16px;
+                border: 2px solid rgba(255,255,255,0.3);
+                border-radius: 50%;
+                border-top-color: #fff;
+                animation: spin 0.8s linear infinite;
+            }
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+        styleInjected = true;
+    }
+
+    function createMessageElement() {
+        if (messageEl) return;
+        injectMessageStyle();
+        messageEl = document.createElement('div');
+        messageEl.id = 'my-tools-message';
+        document.body.appendChild(messageEl);
+    }
+
+    function showMessage(text, persistent = false) {
+        createMessageElement();
+        if (messageTimeout) {
+            clearTimeout(messageTimeout);
+            messageTimeout = null;
+        }
+        messageEl.innerHTML = text;
+        messageEl.style.display = 'flex';
+        if (!persistent) {
+            messageTimeout = setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+    }
+
+    function updateMessage(text) {
+        if (messageEl && messageEl.style.display !== 'none') {
+            messageEl.innerHTML = text;
+        }
+    }
+
+    function hideMessage() {
+        if (messageTimeout) {
+            clearTimeout(messageTimeout);
+            messageTimeout = null;
+        }
+        if (messageEl) {
+            messageEl.style.display = 'none';
+        }
+    }
+
     const KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE = "cmd/dumpResidents/page";
+    const KEY_RESIDENT_DATA = "resident_data";
 
     async function cmdDumpResidents() {
+        if (isExportingResidents) return;
+        isExportingResidents = true;
+        abortExportResidents = false;
+        updateExportButton();
+
         const deptId = Cookie.getItem("dept");
         const csvConv = new cc.CSVRecordConverter([
             { name: "UUID", key: "personId" },
@@ -164,13 +254,41 @@
             { name: "紧急联系电话", key: "emergencyPhone" },
             { name: "备注", key: "remark" },
         ]);
-        const records = [csvConv.headers];
-        try {
-            let curPage = Number(localStorage.getItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE) || 0);
-            if (curPage > 0) {
-                console.log(`resume dumping from page ${curPage}`);
+
+        let records;
+        let nextPage = Number(localStorage.getItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE) || 0);
+        const dataStr = localStorage.getItem(KEY_RESIDENT_DATA);
+        let errorOccurred = false;
+
+        // Resume from breakpoint if exists
+        if (nextPage > 0 && dataStr) {
+            showMessage('Detected breakpoint, restoring data...', false);
+            await cc.delay(500);
+            const lines = dataStr.split('\n');
+            records = lines.map(line => line.split('\t'));
+            console.log(`Resumed with ${records.length - 1} records, starting from page ${nextPage}`);
+        } else {
+            records = [csvConv.headers];
+            localStorage.removeItem(KEY_RESIDENT_DATA);
+            if (nextPage > 0) {
+                localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
+                nextPage = 0;
             }
-            for (; ; ++curPage) {
+        }
+
+        // Show persistent progress indicator
+        hideMessage();
+        showMessage('Exporting resident data, please wait... <span class="spinner"></span>', true);
+
+        try {
+            for (let curPage = nextPage; ; ++curPage) {
+                // Check for user abort
+                if (abortExportResidents) {
+                    throw new Error('User cancelled');
+                }
+
+                updateMessage(`Exporting resident data (page ${curPage + 1})... <span class="spinner"></span>`);
+
                 const result = await listResidents({
                     page: curPage,
                     deptId: deptId,
@@ -178,9 +296,17 @@
                     size: 30
                 });
                 if (result.content.length === 0) {
+                    // No more data, clear breakpoint
+                    localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
                     break;
                 }
-                records.push(...await cc.slicedMap(result.content, async basicPersonInfo => {
+
+                // Check abort before processing each page
+                if (abortExportResidents) {
+                    throw new Error('User cancelled');
+                }
+
+                const convertedRows = await cc.slicedMap(result.content, async basicPersonInfo => {
                     const resp = await queryPersonInfo(
                         _.chain(basicPersonInfo)
                             .pick(["relId", "personId", "houseId", "jwId"])
@@ -188,7 +314,7 @@
                             .value()
                     );
                     const personInfo = _.chain(resp)
-                        .pick(["name", "phone", "cardNo", "hjdz", "personId", "personType", 
+                        .pick(["name", "phone", "cardNo", "hjdz", "personId", "personType",
                             "relId", "liveStatus", "emergencyContact", "emergencyPhone", "remark"])
                         .merge(_.pick(basicPersonInfo, "jzdz"))
                         .update('hjdz', clean)
@@ -197,17 +323,46 @@
                     personInfo.houseId = resp.houseId;
                     personInfo.registeredPopulation = resp.skbz === "1";
                     return csvConv.convertToArray(personInfo);
-                }, 10, async () => await cc.delay(100)));
+                }, 10, async () => await cc.delay(100));
+
+                records.push(...convertedRows);
+                // Persist accumulated data (including header)
+                localStorage.setItem(KEY_RESIDENT_DATA, records.map(row => row.join('\t')).join('\n'));
+                // Save next page for breakpoint
                 localStorage.setItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE, curPage + 1);
             }
-            localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
         } catch (e) {
-            console.error(e);
-            // do nothing
+            errorOccurred = true;
+            hideMessage();
+            if (e.message === 'User cancelled') {
+                showMessage('Export cancelled by user.', false);
+                // Keep cached data for resume
+            } else {
+                console.error(e);
+                alert('Export failed: ' + e.message);
+                // Keep cached data for retry
+            }
+        } finally {
+            isExportingResidents = false;
+            abortExportResidents = false;
+            if (!errorOccurred) {
+                // Successful completion
+                hideMessage();
+                const text = records.map(e => e.join('\t')).join('\n');
+                const blob = new Blob([text], { type: 'text/tsv;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `居民数据_${new Date().toISOString().slice(0,10)}.tsv`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+                localStorage.removeItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE);
+                localStorage.removeItem(KEY_RESIDENT_DATA);
+                alert('Export completed!');
+            }
+            updateExportButton();
         }
-        const text = records.map(e => e.join('\t')).join('\n');
-        console.log(text);
-        await navigator.clipboard.writeText(text);
 
         function clean(s) {
             return s ? s.trim().replace(/\r\n|\r|\n/, ' ') : s;
@@ -526,12 +681,8 @@
         console.log(text);
     }
 
-    // 新增：创建右下角浮动按钮的函数
     function createFloatingButtons() {
-        // 避免重复创建
-        if (document.getElementById('my-tools-buttons')) {
-            return;
-        }
+        if (document.getElementById('my-tools-buttons')) return;
         const container = document.createElement('div');
         container.id = 'my-tools-buttons';
         container.style.cssText = `
@@ -540,18 +691,25 @@
             right: 20px;
             z-index: 99999;
             display: flex;
-            flex-direction: column;
-            gap: 8px;
+            flex-direction: row;        /* 改为水平排列 */
+            gap: 8px;                  /* 按钮间距 */
+            align-items: center;       /* 垂直居中 */
         `;
+
         const buttons = [
-            { label: '导出居民数据', action: cmdDumpResidents },
+            { label: '导出居民数据', action: cmdDumpResidents, id: 'export-residents-btn' },
             { label: '批量添加走访记录', action: cmdAddReceptionVisitRecord },
             { label: '导出地址列表', action: cmdDumpAddresses },
             { label: '导出房屋标签', action: cmdDumpRoomTags }
         ];
-        buttons.forEach(({label, action}) => {
+
+        buttons.forEach(({label, action, id}) => {
             const btn = document.createElement('button');
             btn.textContent = label;
+            if (id) {
+                btn.id = id;
+                exportResidentsBtn = btn;
+            }
             btn.style.cssText = `
                 padding: 8px 14px;
                 background: #409EFF;
@@ -565,17 +723,51 @@
                 transition: background 0.2s;
                 white-space: nowrap;
             `;
-            // 悬浮效果
             btn.addEventListener('mouseenter', () => {
-                btn.style.background = '#66b1ff';
+                if (!btn.disabled) btn.style.background = '#66b1ff';
             });
             btn.addEventListener('mouseleave', () => {
-                btn.style.background = '#409EFF';
+                if (!btn.disabled) {
+                    btn.style.background = (btn.id === 'export-residents-btn' && isExportingResidents)
+                        ? '#F56C6C'
+                        : '#409EFF';
+                }
             });
-            btn.addEventListener('click', action);
+
+            if (id === 'export-residents-btn') {
+                btn.addEventListener('click', function(e) {
+                    if (isExportingResidents) {
+                        abortExportResidents = true;
+                        this.disabled = true;
+                        this.textContent = '正在中断...';
+                        this.style.background = '#909399';
+                    } else {
+                        cmdDumpResidents();
+                    }
+                });
+            } else {
+                btn.addEventListener('click', action);
+            }
             container.appendChild(btn);
         });
+
         document.body.appendChild(container);
+        updateExportButton();
+    }
+
+    function updateExportButton() {
+        if (!exportResidentsBtn) return;
+        if (isExportingResidents) {
+            exportResidentsBtn.textContent = '中断导出';
+            exportResidentsBtn.style.background = '#F56C6C';
+            exportResidentsBtn.disabled = false;
+            return;
+        }
+        const hasResume = localStorage.getItem(KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE) &&
+                          localStorage.getItem(KEY_RESIDENT_DATA);
+        exportResidentsBtn.textContent = hasResume ? '↻ 导出居民数据 (续传)' : '导出居民数据';
+        exportResidentsBtn.style.background = '#409EFF';
+        exportResidentsBtn.disabled = false;
     }
 
     window.addEventListener('load', () => {
