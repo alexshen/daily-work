@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.49
+// @version      0.50
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -740,19 +740,32 @@
 
     async function cmdDumpRoomTags() {
         setButtonsEnabled(false, null);
+        // 显示初始进度
+        showMessage('正在导出房屋标签，请稍候... <span class="spinner"></span>', true);
         try {
             const csvConv = new cc.CSVRecordConverter([
                 { name: "地址", key: "address" },
                 { name: "标签", key: "tags" },
             ]);
             const records = [csvConv.headers];
-            for (const room of await getAddresses()) {
+            const addresses = await getAddresses();
+            const total = addresses.length;
+
+            for (let i = 0; i < total; i++) {
+                const room = addresses[i];
+                // 更新当前进度
+                updateMessage(`正在导出房屋标签 (${i + 1}/${total})... <span class="spinner"></span>`);
+
                 const tags = [];
                 for (const tag of await queryHouseTag(room.id)) {
                     tags.push(tag.tagName);
                 }
                 records.push(csvConv.convertToArray({ address: room.address, tags: tags.join(',') }));
             }
+
+            hideMessage(); // 完成后隐藏进度
+
+            // 生成文件并下载（原逻辑）
             const text = records.map(e => e.join('\t')).join('\n');
             const blob = new Blob([text], { type: 'text/tsv;charset=utf-8' });
             const link = document.createElement('a');
@@ -764,6 +777,7 @@
             URL.revokeObjectURL(link.href);
             alert('房屋标签导出完成！');
         } catch (e) {
+            hideMessage();
             console.error(e);
             alert('导出房屋标签失败：' + e.message);
         } finally {
