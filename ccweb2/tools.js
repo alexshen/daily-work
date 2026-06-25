@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.45
+// @version      0.46
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -196,13 +196,27 @@
         document.body.appendChild(messageEl);
     }
 
-    function showMessage(text, persistent = false) {
+    function showMessage(text, persistent = false, closable = false) {
         createMessageElement();
         if (messageTimeout) {
             clearTimeout(messageTimeout);
             messageTimeout = null;
         }
-        messageEl.innerHTML = text;
+        let content = `<span>${text}</span>`;
+        if (closable) {
+            content += `<span style="cursor:pointer;margin-left:auto;padding-left:15px;font-weight:bold;font-size:18px;" onclick="document.getElementById('my-tools-message').style.display='none';">✕</span>`;
+            persistent = true; // 强制持久
+            // 为错误列表添加滚动和最大高度
+            messageEl.style.maxHeight = '300px';
+            messageEl.style.overflowY = 'auto';
+            messageEl.style.alignItems = 'flex-start'; // 顶部对齐，便于滚动
+        } else {
+            // 恢复默认样式（如果之前被修改）
+            messageEl.style.maxHeight = '';
+            messageEl.style.overflowY = '';
+            messageEl.style.alignItems = 'center';
+        }
+        messageEl.innerHTML = content;
         messageEl.style.display = 'flex';
         if (!persistent) {
             messageTimeout = setTimeout(() => {
@@ -469,86 +483,130 @@
         '其他': "6",
     };
     const RECEPTION_RECORD_FIELDS = [ 'personName', 'visitType', 'visitTime', 'visitContent', 'joinUser' ];
+    
     async function cmdAddReceptionVisitRecord() {
-        const path = await cc.selectFile();
-        if (!path) {
-            return;
-        }
-        const dal = new ReceptionVisitDAL();
-        const staff = await getCachedWorkPersonList();
-        const records = [];
-        for (let r of await cc.readRecords(path)) {
-            // calculate a stable hash
-            r.hash = CryptoJS.MD5(
-                JSON.stringify(
-                    _.chain(r)
-                        .pick(RECEPTION_RECORD_FIELDS)
-                        .sortBy((e) => e[0])
-                        .value()
-                )
-            ).toString();
-            if (dal.has(r.hash)) {
-                continue;
+        showMessage('正在准备...', true);
+        const errors = []; // 收集失败记录
+        try {
+            const path = await cc.selectFile();
+            if (!path) {
+                hideMessage();
+                return;
             }
-            if (r.visitType in VISIT_TYPES === false) {
-                throw new Error(`invalid visitType ${r.visitType}`);
-            }
-            r.joinUser = r.joinUser.split(',');
-            const invalidUsers = r.joinUser.filter(e => e in staff === false);
-            if (invalidUsers.length) {
-                throw new Error(`invalid joinUser ${invalidUsers}`);
-            }
-            r.visitType = VISIT_TYPES[r.visitType];
-            r.visitTime = moment(r.visitTime, "YYYY/MM/DD hh:mm");
-            // ignore records that happen later now
-            if (!r.visitTime.isBefore(moment())) {
-                continue;
-            }
-            records.push(r);
-        }
+            updateMessage('正在解析文件...');
+            const dal = new ReceptionVisitDAL();
+            const staff = await getCachedWorkPersonList();
+            const records = [];
 
-        const deptId = Cookie.getItem('dept');
-        for (let i = 0; i < records.length; ++i) {
-            const r = records[i];
-            const results = await queryPersonList({personName: r.personName, jwId: deptId});
-            if (results.length === 0) {
-                console.warn(`invalid person name: ${r.personName}`);
-                continue;
+            for (let r of await cc.readRecords(path)) {
+            // calculate a stable hash
+                r.hash = CryptoJS.MD5(
+                    JSON.stringify(
+                        _.chain(r)
+                            .pick(RECEPTION_RECORD_FIELDS)
+                            .sortBy((e) => e[0])
+                            .value()
+                    )
+                ).toString();
+                if (dal.has(r.hash)) continue;
+                if (r.visitType in VISIT_TYPES === false) {
+                    throw new Error(`invalid visitType ${r.visitType}`);
+                }
+                r.joinUser = r.joinUser.split(',');
+                const invalidUsers = r.joinUser.filter(e => e in staff === false);
+                if (invalidUsers.length) {
+                    throw new Error(`invalid joinUser ${invalidUsers}`);
+                }
+                r.visitType = VISIT_TYPES[r.visitType];
+                r.visitTime = moment(r.visitTime, "YYYY/MM/DD hh:mm");
+                if (!r.visitTime.isBefore(moment())) continue;
+                records.push(r);
             }
-            if (results.length > 1 && !r.address.length) {
-                console.warn(`non-unique name ${r.personName}, specify an address to disambiguate`);
-                continue;
+
+            if (records.length === 0) {
+                hideMessage();
+                showMessage('没有需要添加的记录', false);
+                return;
             }
-            // find the person with the specified address if there are more than one people with the same name
-            const person = results.length > 1 
-                                ?  results.find(e => e.address.replaceAll('|', '') === r.address) 
-                                : results[0];
-            if (!person) {
-                console.warn(`cannot find person: ${JSON.stringify(r)}`);
-                continue;
+
+            const deptId = Cookie.getItem('dept');
+            let successCount = 0;
+            for (let i = 0; i < records.length; ++i) {
+                // 更新进度
+                updateMessage(`正在添加走访记录 (${i+1}/${records.length}) ... <span class="spinner"></span>`);
+
+                const r = records[i];
+                try {
+                    // 1. 查询人员
+                    const results = await queryPersonList({ personName: r.personName, jwId: deptId });
+                    if (results.length === 0) {
+                        errors.push({ personName: r.personName, address: r.address || '未提供', reason: '查无此人' });
+                        continue;
+                    }
+                    if (results.length > 1 && !r.address) {
+                        errors.push({ personName: r.personName, address: '未提供', reason: '重名且未指定地址' });
+                        continue;
+                    }
+                    const person = results.length > 1
+                        ? results.find(e => e.address.replaceAll('|', '') === r.address)
+                        : results[0];
+                    if (!person) {
+                        errors.push({ personName: r.personName, address: r.address || '未提供', reason: '地址不匹配' });
+                        continue;
+                    }
+
+                    await addReceptionVisitRecord({
+                        address: person.address.replaceAll('|', ' '),
+                        joinUser: r.joinUser.join(','),
+                        joinUserId: r.joinUser.map(e => staff[e]).join(','),
+                        jwId: deptId,
+                        personId: person.personId,
+                        personName: person.name,
+                        relId: person.relId,
+                        visitContent: r.visitContent,
+                        visitTime: r.visitTime,
+                        visitType: r.visitType
+                    });
+
+                    // 成功后才保存去重记录
+                    dal.add(r.hash);
+                    dal.save();
+                    successCount++;
+                    console.log(`[${i+1}/${records.length}] added: ${r.personName}`);
+
+                } catch (e) {
+                    errors.push({
+                        personName: r.personName,
+                        address: r.address || '未提供',
+                        reason: e.message || '未知错误'
+                    });
+                }
+
+                // 随机延迟
+                if (i < records.length - 1) {
+                    await cc.delay(((Math.random() * 5 | 0) * 2) * 1000);
+                }
             }
-            if (i > 0) {
-                // vary the recording time
-                await cc.delay(((Math.random() * 5 | 0) * 2) * 1000);
+
+            hideMessage();
+
+            if (successCount > 0) {
+                showMessage(`成功添加 ${successCount} 条记录`, false);
+                alert(`完成添加，成功 ${successCount} 条`);
             }
-            await addReceptionVisitRecord({
-                address: person.address.replaceAll('|', ' '),
-                joinUser: r.joinUser.join(','),
-                joinUserId: r.joinUser.map(e => staff[e]).join(','),
-                jwId: deptId,
-                personId: person.personId,
-                personName: person.name,
-                relId: person.relId,
-                visitContent: r.visitContent,
-                visitTime: r.visitTime,
-                visitType: r.visitType
-            })
-            console.log(`[${i+1}/${records.length}] added visit record: ${JSON.stringify(_.pick(r, RECEPTION_RECORD_FIELDS))}`);
-            dal.add(r.hash);
-            dal.save();
-        }
-        if (records.length) {
-            alert('finish adding reception visit records');
+
+            if (errors.length > 0) {
+                const errorLines = errors.map(e =>
+                    `姓名：${e.personName}，地址：${e.address}，原因：${e.reason}`
+                );
+                const errorText = '以下记录添加失败：<br>' + errorLines.join('<br>');
+                showMessage(errorText, true, true);
+            }
+
+        } catch (e) {
+            hideMessage();
+            showMessage('添加失败：' + e.message, false);
+            console.error(e);
         }
     }
 
