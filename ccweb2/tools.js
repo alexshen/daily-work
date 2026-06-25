@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.50
+// @version      0.51
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -751,16 +751,17 @@
             const addresses = await getAddresses();
             const total = addresses.length;
 
-            for (let i = 0; i < total; i++) {
-                const room = addresses[i];
-                // 更新当前进度
-                updateMessage(`正在导出房屋标签 (${i + 1}/${total})... <span class="spinner"></span>`);
-
-                const tags = [];
-                for (const tag of await queryHouseTag(room.id)) {
-                    tags.push(tag.tagName);
+            const batchSize = 10;
+            for (let i = 0; i < total; i += batchSize) {
+                const batch = addresses.slice(i, i + batchSize);
+                await Promise.all(batch.map(async (room) => {
+                    const tags = await queryHouseTag(room.id);
+                    records.push(csvConv.convertToArray({ address: room.address, tags: tags.map(t => t.tagName).join(',') }));
+                }));
+                updateMessage(`正在导出房屋标签 (${i + batch.length}/${total})... <span class="spinner"></span>`);
+                if (i + batchSize < total) {
+                    await cc.delay(100); // 每批后等待0.1秒
                 }
-                records.push(csvConv.convertToArray({ address: room.address, tags: tags.join(',') }));
             }
 
             hideMessage(); // 完成后隐藏进度
