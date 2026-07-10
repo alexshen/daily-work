@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ccweb2 tools
 // @namespace    https://github.com/alexshen/daily-work/ccweb2
-// @version      0.51
+// @version      0.52
 // @description  Tools for cc web 2
 // @author       ashen
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -147,6 +147,10 @@
     let abortExportResidents = false;
     let exportResidentsBtn = null;
 
+    let isExportingRoomTags = false;
+    let abortExportRoomTags = false;
+    let exportRoomTagsBtn = null;
+
     let messageTimeout = null;
     let messageEl = null;
     let styleInjected = false;
@@ -247,6 +251,9 @@
 
     const KEY_CMD_DUMP_RESIDENTS_NEXT_PAGE = "cmd/dumpResidents/page";
     const KEY_RESIDENT_DATA = "resident_data";
+
+    const KEY_CMD_DUMP_ROOM_TAGS_NEXT_INDEX = "cmd/dumpRoomTags/index";
+    const KEY_ROOM_TAG_DATA = "room_tag_data";
 
     async function cmdDumpResidents() {
         if (isExportingResidents) return;
@@ -739,34 +746,80 @@
     }
 
     async function cmdDumpRoomTags() {
-        setButtonsEnabled(false, null);
-        // 显示初始进度
-        showMessage('正在导出房屋标签，请稍候... <span class="spinner"></span>', true);
-        try {
-            const csvConv = new cc.CSVRecordConverter([
-                { name: "地址", key: "address" },
-                { name: "标签", key: "tags" },
-            ]);
-            const records = [csvConv.headers];
-            const addresses = await getAddresses();
-            const total = addresses.length;
+        if (isExportingRoomTags) return;
 
+        // ---------- 断点检查与用户确认 ----------
+        let shouldResume = false;
+        const storedNextIndex = localStorage.getItem(KEY_CMD_DUMP_ROOM_TAGS_NEXT_INDEX);
+        const storedData = localStorage.getItem(KEY_ROOM_TAG_DATA);
+        if (storedNextIndex !== null && storedData !== null) {
+            shouldResume = confirm(
+                '检测到未完成的房屋标签导出数据，是否继续恢复？\n点击"确定"恢复，点击"取消"重新开始。'
+            );
+        }
+
+        // ---------- 禁用所有按钮（导出按钮保留点击能力） ----------
+        isExportingRoomTags = true;
+        setButtonsEnabled(false, 'export-room-tags-btn');
+        abortExportRoomTags = false;
+        updateExportRoomTagsButton();
+
+        const csvConv = new cc.CSVRecordConverter([
+            { name: "地址", key: "address" },
+            { name: "标签", key: "tags" },
+        ]);
+
+        let records;
+        let addresses;
+        let total;
+        let errorOccurred = false;
+
+        if (shouldResume) {
+            const lines = storedData.split('\n');
+            records = lines.map(line => line.split('\t'));
+            addresses = await getAddresses();
+            total = addresses.length;
+            console.log(`Resumed with ${records.length - 1} records, starting from index ${storedNextIndex}`);
+            showMessage('正在恢复导出...', false);
+            await cc.delay(500);
+        } else {
+            localStorage.removeItem(KEY_CMD_DUMP_ROOM_TAGS_NEXT_INDEX);
+            localStorage.removeItem(KEY_ROOM_TAG_DATA);
+            records = [csvConv.headers];
+            addresses = await getAddresses();
+            total = addresses.length;
+        }
+
+        hideMessage();
+        showMessage('正在导出房屋标签，请稍候... <span class="spinner"></span>', true);
+
+        try {
             const batchSize = 10;
-            for (let i = 0; i < total; i += batchSize) {
+            for (let i = shouldResume ? Number(storedNextIndex) : 0; i < total; i += batchSize) {
+                if (abortExportRoomTags) throw new Error('User cancelled');
+
                 const batch = addresses.slice(i, i + batchSize);
                 await Promise.all(batch.map(async (room) => {
                     const tags = await queryHouseTag(room.id);
                     records.push(csvConv.convertToArray({ address: room.address, tags: tags.map(t => t.tagName).join(',') }));
                 }));
                 updateMessage(`正在导出房屋标签 (${i + batch.length}/${total})... <span class="spinner"></span>`);
+
+                // 持久化
+                localStorage.setItem(
+                    KEY_ROOM_TAG_DATA,
+                    records.map(row => row.join('\t')).join('\n')
+                );
+                localStorage.setItem(KEY_CMD_DUMP_ROOM_TAGS_NEXT_INDEX, i + batch.length);
+
                 if (i + batchSize < total) {
                     await cc.delay(100); // 每批后等待0.1秒
                 }
             }
 
-            hideMessage(); // 完成后隐藏进度
+            hideMessage();
 
-            // 生成文件并下载（原逻辑）
+            // 成功完成，清除断点并下载文件
             const text = records.map(e => e.join('\t')).join('\n');
             const blob = new Blob([text], { type: 'text/tsv;charset=utf-8' });
             const link = document.createElement('a');
@@ -776,13 +829,25 @@
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(link.href);
+            localStorage.removeItem(KEY_CMD_DUMP_ROOM_TAGS_NEXT_INDEX);
+            localStorage.removeItem(KEY_ROOM_TAG_DATA);
             alert('房屋标签导出完成！');
         } catch (e) {
+            errorOccurred = true;
             hideMessage();
-            console.error(e);
-            alert('导出房屋标签失败：' + e.message);
+            if (e.message === 'User cancelled') {
+                showMessage('导出已取消。', false);
+                // 保留断点缓存，以便后续恢复
+            } else {
+                console.error(e);
+                alert('导出房屋标签失败：' + e.message);
+                // 保留断点缓存以便重试
+            }
         } finally {
+            isExportingRoomTags = false;
+            abortExportRoomTags = false;
             setButtonsEnabled(true, null);
+            updateExportRoomTagsButton();
         }
     }
 
@@ -806,7 +871,7 @@
         const buttons = [
             { label: '导出居民数据', action: cmdDumpResidents, id: 'export-residents-btn' },
             { label: '批量添加走访记录', action: cmdAddReceptionVisitRecord },
-            { label: '导出房屋标签', action: cmdDumpRoomTags }
+            { label: '导出房屋标签', action: cmdDumpRoomTags, id: 'export-room-tags-btn' }
         ];
 
         buttons.forEach(({label, action, id}) => {
@@ -814,7 +879,11 @@
             btn.textContent = label;
             if (id) {
                 btn.id = id;
-                exportResidentsBtn = btn;
+                if (id === 'export-residents-btn') {
+                    exportResidentsBtn = btn;
+                } else if (id === 'export-room-tags-btn') {
+                    exportRoomTagsBtn = btn;
+                }
             }
             btn.style.cssText = `
                 padding: 8px 14px;
@@ -834,9 +903,9 @@
             });
             btn.addEventListener('mouseleave', () => {
                 if (!btn.disabled) {
-                    btn.style.background = (btn.id === 'export-residents-btn' && isExportingResidents)
-                        ? '#F56C6C'
-                        : '#409EFF';
+                    const isExporting = (btn.id === 'export-residents-btn' && isExportingResidents)
+                        || (btn.id === 'export-room-tags-btn' && isExportingRoomTags);
+                    btn.style.background = isExporting ? '#F56C6C' : '#409EFF';
                 }
             });
 
@@ -851,6 +920,17 @@
                         cmdDumpResidents();
                     }
                 });
+            } else if (id === 'export-room-tags-btn') {
+                btn.addEventListener('click', function(e) {
+                    if (isExportingRoomTags) {
+                        abortExportRoomTags = true;
+                        this.disabled = true;
+                        this.textContent = '正在中断...';
+                        this.style.background = '#909399';
+                    } else {
+                        cmdDumpRoomTags();
+                    }
+                });
             } else {
                 btn.addEventListener('click', action);
             }
@@ -860,6 +940,7 @@
 
         document.body.appendChild(container);
         updateExportButton();
+        updateExportRoomTagsButton();
     }
     
     function setButtonsEnabled(enabled, excludeId) {
@@ -867,11 +948,10 @@
             if (excludeId && btn.id === excludeId) return;
             btn.disabled = !enabled;
             if (enabled) {
-                // 非导出按钮恢复默认背景
-                if (btn.id !== 'export-residents-btn') {
+                // 导出按钮背景由各自的 update 函数统一管理
+                if (btn.id !== 'export-residents-btn' && btn.id !== 'export-room-tags-btn') {
                     btn.style.background = '#409EFF';
                 }
-                // 导出按钮背景由 updateExportButton 统一管理，此处不设置
             } else {
                 btn.style.background = '#c0c4cc';
             }
@@ -879,6 +959,7 @@
         // 当启用所有按钮（无排除）时，刷新导出按钮状态
         if (enabled && !excludeId) {
             updateExportButton();
+            updateExportRoomTagsButton();
         }
     }
 
@@ -895,6 +976,21 @@
         exportResidentsBtn.textContent = hasResume ? '↻ 导出居民数据 (续传)' : '导出居民数据';
         exportResidentsBtn.style.background = '#409EFF';
         exportResidentsBtn.disabled = false;
+    }
+
+    function updateExportRoomTagsButton() {
+        if (!exportRoomTagsBtn) return;
+        if (isExportingRoomTags) {
+            exportRoomTagsBtn.textContent = '中断导出';
+            exportRoomTagsBtn.style.background = '#F56C6C';
+            exportRoomTagsBtn.disabled = false;
+            return;
+        }
+        const hasResume = localStorage.getItem(KEY_CMD_DUMP_ROOM_TAGS_NEXT_INDEX) &&
+                          localStorage.getItem(KEY_ROOM_TAG_DATA);
+        exportRoomTagsBtn.textContent = hasResume ? '↻ 导出房屋标签 (续传)' : '导出房屋标签';
+        exportRoomTagsBtn.style.background = '#409EFF';
+        exportRoomTagsBtn.disabled = false;
     }
 
     window.addEventListener('load', () => {
