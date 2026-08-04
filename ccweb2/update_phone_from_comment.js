@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         自动更新联系方式 (基于备注中的phone)
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  当对话框显示时，若备注字段包含 "电话:12345" 或 "phone:12345"，则自动将联系方式字段修改为该号码
 // @author       You
 // @match        https://jczl.sh.cegn.cn/web/*
@@ -22,6 +22,25 @@
         if (!remarkText) return null;
         const match = remarkText.match(/(?:电话|phone)\s*[:：]\s*(\d+)/i);
         return match ? match[1] : null;
+    }
+
+    // 获取节点文本（兼容元素节点与文本节点）
+    function getNodeText(node) {
+        return node ? (node.textContent || '').trim() : '';
+    }
+
+    // 更新联系方式文本并标红（文本节点会被包装为 span 以便上色）
+    function setContactNumber(node, text) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const span = document.createElement('span');
+            span.style.color = 'red';
+            span.textContent = text;
+            node.parentNode.replaceChild(span, node);
+            return span;
+        }
+        node.textContent = text;
+        node.style.color = 'red';
+        return node;
     }
 
     // 更新指定 dialog 中的联系方式字段
@@ -74,13 +93,13 @@
         if (!contactSpan) return false;
 
         // 避免重复更新相同的号码
-        if (processedSet.has(contactSpan) && contactSpan.innerText === phoneNumber) return false;
+        if (processedSet.has(contactSpan) && getNodeText(contactSpan) === phoneNumber) return false;
 
-        const oldNumber = contactSpan.innerText;
+        const oldNumber = getNodeText(contactSpan);
         if (oldNumber !== phoneNumber) {
-            contactSpan.innerText = phoneNumber;
+            contactSpan = setContactNumber(contactSpan, phoneNumber);
             processedSet.add(contactSpan);
-            console.log(`[脚本] 已更新联系方式：${oldNumber} → ${phoneNumber} (来自备注)`);
+            console.log(`[脚本] 已更新联系方式：${oldNumber || '无'} → ${phoneNumber} (来自备注)`);
             return true;
         }
         return false;
