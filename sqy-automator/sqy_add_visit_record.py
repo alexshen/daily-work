@@ -19,6 +19,9 @@ VISIT_RECORD_URL = "https://jczl.sh.cegn.cn/web/#/jczlplatform/rcgz/syjdzf"
 DATA_API = "/sqy-admin/api/sqReceptionVisit"  # data request that signals page load
 PAGE_LOAD_TIMEOUT_MS = 30_000  # how long to wait for that request to finish
 
+NEW_RECORD_BUTTON = "button.el-button--primary.filter-item:has-text('新增')"
+VISIT_DIALOG = "div.el-dialog__wrapper.sqVisitDialog"
+
 
 def current_url(page):
     """Return the live URL from the page.
@@ -55,6 +58,17 @@ def wait_for_visit_record_data(page, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     return resp_info.value
 
 
+def open_new_record_dialog(page, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
+    """Click the 新增 button and wait for the visit-record dialog to show up.
+
+    Element UI keeps the dialog wrapper in the DOM but hidden (display:none)
+    until opened, so we wait for it to become visible rather than just exist.
+    """
+    page.locator(NEW_RECORD_BUTTON).click()
+    page.wait_for_selector(VISIT_DIALOG, state="visible", timeout=timeout_ms)
+    print("新增对话框已打开")
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
@@ -73,6 +87,8 @@ def main():
 
         resp = wait_for_visit_record_data(page)
         print(f"已进入平台，{DATA_API} 返回状态码: {resp.status}")
+
+        open_new_record_dialog(page)
 
         # ---- 后续添加走访记录的操作写在这里，浏览器保持打开 ----
 
