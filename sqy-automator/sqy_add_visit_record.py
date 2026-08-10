@@ -15,6 +15,10 @@ LOGIN_URL = "https://jczl.sh.cegn.cn/web/#/login"
 LOGIN_HASH = "#/login"
 LOGIN_TIMEOUT_SECONDS = 5 * 60  # how long to wait for the user to scan
 
+VISIT_RECORD_URL = "https://jczl.sh.cegn.cn/web/#/jczlplatform/rcgz/syjdzf"
+DATA_API = "/sqy-admin/api/sqReceptionVisit"  # data request that signals page load
+PAGE_LOAD_TIMEOUT_MS = 30_000  # how long to wait for that request to finish
+
 
 def current_url(page):
     """Return the live URL from the page.
@@ -37,6 +41,20 @@ def wait_for_login_redirect(page, timeout_seconds=LOGIN_TIMEOUT_SECONDS):
     raise TimeoutError(f"QR login not completed within {timeout_seconds}s")
 
 
+def wait_for_visit_record_data(page, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
+    """Navigate to the 走访登记平台 page and wait for its data to load.
+
+    The SPA is hash-routed, so changing the route fires an XHR for
+    /sqy-admin/api/sqReceptionVisit. We start listening for that response
+    before navigating, then block until it completes.
+    """
+    with page.expect_response(
+        lambda r: DATA_API in r.url, timeout=timeout_ms
+    ) as resp_info:
+        page.goto(VISIT_RECORD_URL, wait_until="domcontentloaded")
+    return resp_info.value
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
@@ -52,6 +70,9 @@ def main():
             sys.exit(1)
 
         print(f"登录成功，已跳转到: {final_url}")
+
+        resp = wait_for_visit_record_data(page)
+        print(f"已进入平台，{DATA_API} 返回状态码: {resp.status}")
 
         # ---- 后续添加走访记录的操作写在这里，浏览器保持打开 ----
 
