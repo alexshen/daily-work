@@ -16,12 +16,23 @@ LOGIN_HASH = "#/login"
 LOGIN_TIMEOUT_SECONDS = 5 * 60  # how long to wait for the user to scan
 
 
+def current_url(page):
+    """Return the live URL from the page.
+
+    Reads window.location.href instead of page.url because Playwright's
+    page.url is not reliably refreshed on hash-only SPA navigation
+    (#/login -> #/home/new), while the DOM always reflects the true URL.
+    """
+    return page.evaluate("window.location.href")
+
+
 def wait_for_login_redirect(page, timeout_seconds=LOGIN_TIMEOUT_SECONDS):
     """Block until the page URL no longer points at the login page."""
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
-        if LOGIN_HASH not in page.url:
-            return page.url
+        url = current_url(page)
+        if LOGIN_HASH not in url:
+            return url
         time.sleep(1)
     raise TimeoutError(f"QR login not completed within {timeout_seconds}s")
 
