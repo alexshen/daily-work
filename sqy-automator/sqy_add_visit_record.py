@@ -24,7 +24,7 @@ VISIT_DIALOG = "div.el-dialog__wrapper.sqVisitDialog"
 
 # 示例记录；运行时可按需修改。参与人员用空格分隔的姓名列表。
 EXAMPLE_RECORD = {
-    "方式": "上门走访",  # 需是 方式 下拉框里存在的选项
+    "方式": "走访",  # 需是 方式 下拉框里存在的选项
     "走访时间": "2026-08-12 14:30:00",  # 需与日期时间选择器的格式一致
     "参与人员": "李凯 朱晓庆",  # 空格分隔；姓名需在下拉框里存在
     "走访详情": "上门了解老人近期生活状况。",
@@ -95,7 +95,7 @@ def _open_dropdown_and_get(page, form_item, timeout_ms=5000):
     form_item.locator(".el-select input.el-input__inner").click()
     # 1.15 没有 locator.wait_for，用 page.wait_for_selector 等待下拉出现
     page.wait_for_selector(
-        ".el-select-dropdown.el-popper", state="visible", timeout=timeout_ms
+        ".el-select-dropdown.el-popper:visible", state="visible", timeout=timeout_ms
     )
     # 模板里可能还有一个 display:none 的下拉副本，挑可见的那个返回
     dropdowns = page.locator(".el-select-dropdown.el-popper")
@@ -108,7 +108,7 @@ def _open_dropdown_and_get(page, form_item, timeout_ms=5000):
 def set_visit_type(page, dialog, value):
     """Fill the single-select 方式 field; single-select closes automatically."""
     dropdown = _open_dropdown_and_get(page, _form_item(dialog, "方式"))
-    dropdown.locator(f".el-select-dropdown__item:text-is('{value}')").click()
+    dropdown.locator(f".el-select-dropdown__item:has-text('{value}')").click()
 
 
 def set_visit_time(dialog, value):
