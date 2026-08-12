@@ -92,7 +92,7 @@ def _open_dropdown_and_get(page, form_item, timeout_ms=5000):
     (class .el-select-dropdown.el-popper, display not none when open), so locate
     it at page level rather than inside the select.
     """
-    form_item.locator(".el-select input.el-input__inner").click()
+    form_item.locator(".el-select").click()
     # 1.15 没有 locator.wait_for，用 page.wait_for_selector 等待下拉出现
     page.wait_for_selector(
         ".el-select-dropdown.el-popper:visible", state="visible", timeout=timeout_ms
