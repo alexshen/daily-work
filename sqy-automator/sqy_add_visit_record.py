@@ -157,13 +157,22 @@ def set_visit_type(page, dialog, value):
 def set_visit_time(page, dialog, value):
     """Fill the 走访时间 datetime input and confirm with the picker's 确定 button.
 
-    Element UI's datetime picker does not commit or close on Enter; the panel
-    stays open until its footer 确定 button is clicked. That button lives at
-    page level (the picker is teleported to <body>), so `page` is required.
+    Element UI's datetime picker normally keeps the panel open after Enter until
+    its footer 确定 button is clicked, but Enter sometimes dismisses the panel on
+    its own. So after Enter we wait for the panel to settle and only click 确定
+    if the panel is still visible. The button lives at page level (the picker is
+    teleported to <body>), so `page` is required.
     """
     inp = _form_item(dialog, "走访时间").locator("input.el-input__inner")
     inp.fill(value)
     inp.press("Enter")
+    # Enter 有时会自己关掉面板（带 ~300ms 关闭动画）。等它稳定：若面板已隐藏
+    # 说明 Enter 已提交完成，无需再点“确定”；仍显示则点“确定”确认选择。
+    try:
+        page.wait_for_selector(".el-picker-panel", state="hidden", timeout=1500)
+        return
+    except TimeoutError:
+        pass
     page.locator(
         ".el-picker-panel__footer .el-picker-panel__link-btn:has-text('确定')"
     ).click()
