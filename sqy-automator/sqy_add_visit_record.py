@@ -194,17 +194,20 @@ def set_join_users(page, dialog, users):
     form_item = _form_item(dialog, "参与人员")
 
     # Remove current tags whose name is not in the target list.
-    while True:
-        tag_to_remove = None
-        tags = form_item.locator(".el-tag")
-        for i in range(tags.count()):
-            name = tags.nth(i).locator(".el-select__tags-text").inner_text().strip()
-            if name not in target:
-                tag_to_remove = tags.nth(i)
-                break
-        if tag_to_remove is None:
-            break
-        tag_to_remove.locator(".el-tag__close").click()
+    #
+    # 两遍完成：先收集所有待移除的标签（此时尚无任何点击，DOM 稳定，读取安全），
+    # 再逐个点击关闭图标。点击让 Vue 异步移除标签，若边读边点，下一轮可能读到正在
+    # 消失的标签导致 inner_text() 按默认 30s 超时阻塞。按倒序点击：移除后面的标签
+    # 只会让更靠前的下标保持有效，先点后面的就不会使前面收集到的标签下标失效。
+    to_remove = []
+    tags = form_item.locator(".el-tag")
+    for i in range(tags.count()):
+        tag = tags.nth(i)
+        name = tag.locator(".el-select__tags-text").inner_text().strip()
+        if name not in target:
+            to_remove.append(tag)
+    for tag in reversed(to_remove):
+        tag.locator(".el-tag__close").click()
 
     # Pick the listed names from the dropdown (multi-select stays open on click).
     dropdown = _open_dropdown_and_get(page, form_item)
