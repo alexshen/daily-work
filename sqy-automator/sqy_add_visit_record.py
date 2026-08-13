@@ -28,6 +28,8 @@ RESIDENT_DIALOG = ".el-dialog[aria-label='选择居民']"
 RESIDENT_SEARCH_INPUT = "input[placeholder='输入用户姓名检索']"
 RESIDENT_SEARCH_BUTTON = "button:has-text('搜索')"
 RESIDENT_SEARCH_API = "/sqy-admin/api/sqReceptionVisit/queryPersonList"
+RESIDENT_SEARCH_RETRIES = 3        # 服务器不稳定，搜索请求失败时的重试次数
+RESIDENT_SEARCH_RETRY_INTERVAL = 1  # 每次重试之间的间隔（秒）
 
 
 class RecordSkipped(Exception):
@@ -209,14 +211,37 @@ def set_visit_target(page, dialog, name, address=None, timeout_ms=PAGE_LOAD_TIME
         raise RecordSkipped(reason)
 
     # 结果数据加密，只能判断请求是否成功：以 queryPersonList 响应返回且其 JSON 的
-    # status 字段为 200 作为搜索完成信号（不解析加密的 data）。
+    # status 字段为 200 作为搜索完成信号（不解析加密的 data）。服务器不稳定时
+    # 请求可能超时或 status != 200，重试 RESIDENT_SEARCH_RETRIES 次。
     resident_dialog.locator(RESIDENT_SEARCH_INPUT).fill(name)
-    with page.expect_response(
-        lambda r: RESIDENT_SEARCH_API in r.url, timeout=timeout_ms
-    ) as resp_info:
-        resident_dialog.locator(RESIDENT_SEARCH_BUTTON).click()
-    if resp_info.value.json().get("status") != 200:
-        _skip(f"走访对象搜索请求失败（status != 200），跳过该条记录")
+    last_reason = None
+    for attempt in range(1, RESIDENT_SEARCH_RETRIES + 1):
+        ok = False
+        try:
+            with page.expect_response(
+                lambda r: RESIDENT_SEARCH_API in r.url, timeout=timeout_ms
+            ) as resp_info:
+                resident_dialog.locator(RESIDENT_SEARCH_BUTTON).click()
+            if resp_info.value.json().get("status") == 200:
+                ok = True
+            else:
+                last_reason = "status != 200"
+        except TimeoutError:
+            last_reason = f"{timeout_ms}ms 内未收到响应"
+        if ok:
+            break
+        if attempt < RESIDENT_SEARCH_RETRIES:
+            print(
+                f"走访对象搜索第 {attempt} 次失败（{last_reason}），"
+                f"{RESIDENT_SEARCH_RETRY_INTERVAL}s 后重试 ...",
+                file=sys.stderr,
+            )
+            time.sleep(RESIDENT_SEARCH_RETRY_INTERVAL)
+    else:
+        _skip(
+            f"走访对象搜索请求 {RESIDENT_SEARCH_RETRIES} 次均失败"
+            f"（{last_reason}），跳过该条记录"
+        )
 
     # 轮询等数据行渲染，按姓名（以及可选的地址）匹配目标行；结果表持续处于
     # “暂无数据”空状态（tbody 无数据行且空状态文本连续可见）时判为查无此人。
