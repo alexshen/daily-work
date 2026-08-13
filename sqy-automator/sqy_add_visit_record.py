@@ -442,23 +442,22 @@ def fill_visit_record_form(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS
 def parse_service_tags(value):
     """把 服务标签 单元格解析成记录里的列表形式。
 
-    单元格可以是 JSON 字符串（结构同 EXAMPLE_RECORD 的 服务标签：dict 列表，每个
-    含 tag 与服务表单字段），也可以是单个标签名（如 "困难老年人探访关爱"），后者
-    包装成 [{"tag": 标签名}]。非字符串原样返回。
+    单元格是 JSON 字符串（结构同 EXAMPLE_RECORD 的 服务标签：dict 列表，每个含 tag
+    与服务表单字段）。JSON 解析失败或非 JSON 字符串时返回空列表。非字符串原样返回。
     """
     if isinstance(value, str):
         text = value.strip()
-        if text.startswith("[") or text.startswith("{"):
-            try:
-                parsed = json.loads(text)
-            except json.JSONDecodeError as exc:
-                print(f"警告: 服务标签 JSON 解析失败（{exc}），按单个标签处理",
-                      file=sys.stderr)
-                return [{"tag": text}]
-            if isinstance(parsed, dict):
-                parsed = [parsed]
-            return parsed
-        return [{"tag": text}]
+        if not (text.startswith("[") or text.startswith("{")):
+            return []
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            print(f"警告: 服务标签 JSON 解析失败（{exc}），返回空列表",
+                  file=sys.stderr)
+            return []
+        if isinstance(parsed, dict):
+            parsed = [parsed]
+        return parsed
     return value
 
 
