@@ -6,9 +6,14 @@ scan the QR code with their phone. Once scanned, the browser is redirected
 away from the login page and the script proceeds to add the visit record.
 """
 
+import argparse
+import datetime
+import json
 import sys
 import time
+from itertools import zip_longest
 
+from openpyxl import load_workbook
 from playwright.sync_api import sync_playwright
 
 LOGIN_URL = "https://jczl.sh.cegn.cn/web/#/login"
@@ -30,6 +35,12 @@ RESIDENT_SEARCH_BUTTON = "button:has-text('搜索')"
 RESIDENT_SEARCH_API = "/sqy-admin/api/sqReceptionVisit/queryPersonList"
 RESIDENT_SEARCH_RETRIES = 3        # 服务器不稳定，搜索请求失败时的重试次数
 RESIDENT_SEARCH_RETRY_INTERVAL = 1  # 每次重试之间的间隔（秒）
+
+SUBMIT_API = "/sqy-admin/api/bfForm/saveVisit"  # 提交走访记录的请求
+CONFIRM_BUTTON = "div.el-dialog__footer button:has-text('确认')"  # 对话框底部“确认”按钮
+BASE_FIELDS = {
+    "走访对象", "居住地址", "方式", "走访时间", "参与人员", "走访详情", "服务标签",
+}
 
 
 class RecordSkipped(Exception):
@@ -100,10 +111,13 @@ def open_new_record_dialog(page, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
 
     Element UI keeps the dialog wrapper in the DOM but hidden (display:none)
     until opened, so we wait for it to become visible rather than just exist.
+    Returns the visible dialog locator, for fill_visit_record_form and
+    submit_visit_record to operate on.
     """
     page.locator(NEW_RECORD_BUTTON).click()
     page.wait_for_selector(VISIT_DIALOG, state="visible", timeout=timeout_ms)
     print("新增对话框已打开")
+    return page.locator(VISIT_DIALOG)
 
 
 def _form_item(dialog, label):
@@ -399,11 +413,11 @@ def set_visit_target(page, dialog, name, address, timeout_ms=PAGE_LOAD_TIMEOUT_M
     print(f"已设置走访对象: {_form_item(dialog, '走访对象').inner_text().strip()}")
 
 
-def fill_visit_record_form(page, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
+def fill_visit_record_form(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     """Fill the open 新增接待走访 dialog from `record`.
 
-    Supported keys: 走访对象, 居住地址, 方式, 走访时间, 参与人员, 走访详情,
-    服务标签.
+    `dialog` is the locator returned by open_new_record_dialog. Supported keys:
+    走访对象, 居住地址, 方式, 走访时间, 参与人员, 走访详情, 服务标签.
     走访对象 must come first: if the resident can't be found, RecordSkipped is
     raised and the remaining fields are left untouched (the record is skipped).
     走访对象 要求记录里同时提供居住地址（用于在结果表里精确匹配“地址”列）。
@@ -411,9 +425,6 @@ def fill_visit_record_form(page, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     填写按 SERVICE_TAG_FORM_STRUCTURES 定义的类型进行。
     Keys absent from `record` are left untouched.
     """
-    page.wait_for_selector(VISIT_DIALOG, state="visible", timeout=timeout_ms)
-    dialog = page.locator(VISIT_DIALOG)
-
     if "走访对象" in record:
         set_visit_target(page, dialog, record["走访对象"], record["居住地址"])
     if "方式" in record:
@@ -428,7 +439,218 @@ def fill_visit_record_form(page, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
         set_service_tags(page, dialog, record["服务标签"])
 
 
+def parse_service_tags(value):
+    """把 服务标签 单元格解析成记录里的列表形式。
+
+    单元格可以是 JSON 字符串（结构同 EXAMPLE_RECORD 的 服务标签：dict 列表，每个
+    含 tag 与服务表单字段），也可以是单个标签名（如 "困难老年人探访关爱"），后者
+    包装成 [{"tag": 标签名}]。非字符串原样返回。
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("[") or text.startswith("{"):
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError as exc:
+                print(f"警告: 服务标签 JSON 解析失败（{exc}），按单个标签处理",
+                      file=sys.stderr)
+                return [{"tag": text}]
+            if isinstance(parsed, dict):
+                parsed = [parsed]
+            return parsed
+        return [{"tag": text}]
+    return value
+
+
+def parse_record(raw):
+    """把一行原始单元格值整理成 fill_visit_record_form 能用的记录 dict。
+
+    去掉 None / 全空白的值；走访时间 若是 Excel 日期对象则格式化为
+    %Y-%m-%d %H:%M:%S 以匹配日期时间选择器的格式；服务标签 经 parse_service_tags
+    解析成列表。
+    """
+    record = {}
+    for key, value in raw.items():
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        record[key] = value
+    if "走访时间" in record and isinstance(record["走访时间"], datetime.datetime):
+        record["走访时间"] = record["走访时间"].strftime("%Y-%m-%d %H:%M:%S")
+    if "服务标签" in record:
+        record["服务标签"] = parse_service_tags(record["服务标签"])
+    return record
+
+
+def read_visit_records(path, months):
+    """从 xlsx 读取走访记录，按月份（表）与行序返回记录 dict 列表。
+
+    每个工作表名为 `X月`。第一行为表头，列名即记录字段（走访对象、居住地址、方式、
+    走访时间、参与人员、走访详情、服务标签）；其后每行是一条记录。指定的月份工作表
+    不存在时打印错误并以非零码退出；表头里非示例字段的列打印警告并被忽略。
+    """
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except FileNotFoundError:
+        print(f"错误: 找不到文件 {path}", file=sys.stderr)
+        sys.exit(1)
+    records = []
+    for month in months:
+        title = f"{month}月"
+        if title not in wb.sheetnames:
+            print(f"错误: 工作表 {title} 不存在，可用工作表: {wb.sheetnames}",
+                  file=sys.stderr)
+            sys.exit(1)
+        ws = wb[title]
+        rows = ws.iter_rows(values_only=True)
+        header = [(str(c).strip() if c is not None else "") for c in next(rows, ())]
+        for col in header:
+            if col and col not in BASE_FIELDS:
+                print(f"警告: 工作表 {title} 的列 {col} 不是示例记录的字段，将被忽略",
+                      file=sys.stderr)
+        for row in rows:
+            raw = {}
+            for col, value in zip_longest(header, row):
+                if not col:
+                    continue
+                raw[col] = value
+            if raw:
+                records.append(parse_record(raw))
+    return records
+
+
+def _valid_month(text):
+    try:
+        m = int(text)
+    except ValueError:
+        print(f"错误: 月份参数不是数字: {text}", file=sys.stderr)
+        sys.exit(1)
+    if not 1 <= m <= 12:
+        print(f"错误: 月份超出范围 1-12: {text}", file=sys.stderr)
+        sys.exit(1)
+    return m
+
+
+def parse_months(raw_values):
+    """把 --months 参数展开为排序去重的月份数字列表。
+
+    每项可以是单个月份数字，或 `from,to` 的闭区间（含 to）。省略时默认当前月份。
+    """
+    if not raw_values:
+        return [datetime.date.today().month]
+    months = set()
+    for item in raw_values:
+        parts = item.split(",")
+        if len(parts) == 1:
+            months.add(_valid_month(item))
+        elif len(parts) == 2:
+            lo, hi = _valid_month(parts[0]), _valid_month(parts[1])
+            if lo > hi:
+                print(f"错误: 月份区间 {item} 的起始月大于结束月", file=sys.stderr)
+                sys.exit(1)
+            months.update(range(lo, hi + 1))
+        else:
+            print(f"错误: 无法识别的月份参数: {item}", file=sys.stderr)
+            sys.exit(1)
+    return sorted(months)
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description="在 sqy 上新增接待走访记录；从 xlsx 读取记录并逐条填写、提交。"
+    )
+    parser.add_argument(
+        "-i", "--input",
+        metavar="XLSX",
+        help="走访记录 xlsx 文件路径；省略则使用内置示例记录 EXAMPLE_RECORD",
+    )
+    parser.add_argument(
+        "--months",
+        nargs="*",
+        metavar="M",
+        help="要读取的工作表月份（对应 X月 工作表），可为单个数字或 from,to 闭区间；"
+             "省略则默认当前月份",
+    )
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="每填完一条记录后暂停，按回车确认后再提交并继续下一条",
+    )
+    args = parser.parse_args(argv)
+    args.months = parse_months(args.months)
+    return args
+
+
+def close_visit_dialog(page, timeout_ms=5000):
+    """关闭“新增接待走访”对话框并等它隐藏（尽力而为）。
+
+    优先点右上角关闭按钮；找不到时按 Escape（Element UI 默认支持）。用于某条记录
+    跳过/提交失败后，保证下一条记录能重新打开对话框。关闭失败只打印警告，不中断
+    后续记录。
+    """
+    dialog = page.locator(VISIT_DIALOG)
+    if dialog.is_visible():
+        close_btn = dialog.locator(".el-dialog__headerbtn")
+        if close_btn.count() > 0:
+            close_btn.click()
+        else:
+            page.keyboard.press("Escape")
+    try:
+        page.wait_for_selector(VISIT_DIALOG, state="hidden", timeout=timeout_ms)
+    except TimeoutError:
+        print("警告: 对话框未能自动关闭", file=sys.stderr)
+
+
+def submit_visit_record(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
+    """点对话框底部“确认”按钮提交当前走访记录，返回是否成功。
+
+    `dialog` 是 open_new_record_dialog 返回的 locator。提交后等待
+    /sqy-admin/api/bfForm/saveVisit 响应；其 JSON 的 status 字段为 200 视为成功
+    （判读方式与搜索请求一致），否则打印错误并返回 False。提交成功后对话框通常自动
+    关闭；若未关闭则点右上角 X 关掉，保证下一条能重开。`record` 仅用于错误提示里
+    定位是哪条记录。
+    """
+    confirm_btn = dialog.locator(CONFIRM_BUTTON)
+    if confirm_btn.count() == 0:
+        confirm_btn = dialog.locator("button:has-text('确认')")
+    if confirm_btn.count() == 0:
+        raise TimeoutError("未找到“确认”按钮")
+
+    with page.expect_response(
+        lambda r: SUBMIT_API in r.url, timeout=timeout_ms
+    ) as resp_info:
+        confirm_btn.click()
+    resp = resp_info.value
+    try:
+        data = resp.json()
+        status = data.get("status") if isinstance(data, dict) else None
+    except ValueError:
+        status = None
+    if status == 200:
+        print("提交成功")
+        ok = True
+    else:
+        print(f"错误: 保存请求失败（status={status}），记录: {record.get('走访对象')}",
+              file=sys.stderr)
+        ok = False
+
+    # 保存成功后对话框通常自动关闭；没关闭就关掉它。
+    try:
+        page.wait_for_selector(VISIT_DIALOG, state="hidden", timeout=5000)
+    except TimeoutError:
+        close_visit_dialog(page)
+    return ok
+
+
 def main():
+    args = parse_args()
+    if args.input:
+        records = read_visit_records(args.input, args.months)
+    else:
+        records = [EXAMPLE_RECORD]
+    print(f"共读取 {len(records)} 条记录")
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         page = browser.new_page()
@@ -447,17 +669,34 @@ def main():
         resp = wait_for_visit_record_data(page)
         print(f"已进入平台，{DATA_API} 返回状态码: {resp.status}")
 
-        open_new_record_dialog(page)
+        success_count = 0
+        failed_count = 0
+        for i, record in enumerate(records, 1):
+            dialog = open_new_record_dialog(page)
+            try:
+                fill_visit_record_form(page, dialog, record)
+                if args.confirm:
+                    input(
+                        f"已填写第 {i}/{len(records)} 条记录，"
+                        f"请检查表单，按回车提交并继续..."
+                    )
+                if submit_visit_record(page, dialog, record):
+                    success_count += 1
+                else:
+                    failed_count += 1
+            except RecordSkipped as exc:
+                failed_count += 1
+                print(f"错误: {exc}", file=sys.stderr)
+                close_visit_dialog(page)
+            except TimeoutError as exc:
+                failed_count += 1
+                print(f"错误: {exc}", file=sys.stderr)
+                close_visit_dialog(page)
 
-        try:
-            fill_visit_record_form(page, EXAMPLE_RECORD)
-        except RecordSkipped as exc:
-            print(exc, file=sys.stderr)
-            browser.close()
-            sys.exit(1)
-
-        print("表单已按示例记录填写，浏览器保持打开供检查")
-        input("检查表单填写结果，按回车退出...")
+        print(f"共 {len(records)} 条记录：成功 {success_count} 条，失败/跳过 {failed_count} 条")
+        print("浏览器保持打开供检查，按回车退出...")
+        input()
+        browser.close()
 
 
 if __name__ == "__main__":
