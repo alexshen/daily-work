@@ -111,13 +111,19 @@ def set_visit_type(page, dialog, value):
     dropdown.locator(f".el-select-dropdown__item:has-text('{value}')").click()
 
 
-def set_visit_time(dialog, value):
-    """Fill the 走访时间 datetime input, committing with Enter (blur fallback)."""
+def set_visit_time(page, dialog, value):
+    """Fill the 走访时间 datetime input and confirm with the picker's 确定 button.
+
+    Element UI's datetime picker does not commit or close on Enter; the panel
+    stays open until its footer 确定 button is clicked. That button lives at
+    page level (the picker is teleported to <body>), so `page` is required.
+    """
     inp = _form_item(dialog, "走访时间").locator("input.el-input__inner")
     inp.fill(value)
     inp.press("Enter")
-    if inp.input_value() != value:
-        inp.press("Tab")  # date panel may have swallowed Enter; blur commits
+    page.locator(
+        ".el-picker-panel__footer .el-picker-panel__link-btn:has-text('确定')"
+    ).click()
 
 
 def set_join_users(page, dialog, users):
@@ -181,7 +187,7 @@ def fill_visit_record_form(page, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     if "方式" in record:
         set_visit_type(page, dialog, record["方式"])
     if "走访时间" in record:
-        set_visit_time(dialog, record["走访时间"])
+        set_visit_time(page, dialog, record["走访时间"])
     if "参与人员" in record:
         set_join_users(page, dialog, record["参与人员"])
     if "走访详情" in record:
