@@ -14,7 +14,7 @@ import time
 from itertools import zip_longest
 
 from openpyxl import load_workbook
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 LOGIN_URL = "https://jczl.sh.cegn.cn/web/#/login"
 LOGIN_HASH = "#/login"
@@ -89,7 +89,7 @@ def wait_for_login_redirect(page, timeout_seconds=LOGIN_TIMEOUT_SECONDS):
         if LOGIN_HASH not in url:
             return url
         time.sleep(1)
-    raise TimeoutError(f"QR login not completed within {timeout_seconds}s")
+    raise PlaywrightTimeoutError(f"QR login not completed within {timeout_seconds}s")
 
 
 def wait_for_visit_record_data(page, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
@@ -145,7 +145,7 @@ def _open_dropdown_and_get(page, form_item, timeout_ms=5000):
     for i in range(dropdowns.count()):
         if dropdowns.nth(i).is_visible():
             return dropdowns.nth(i)
-    raise TimeoutError("下拉列表未出现")
+    raise PlaywrightTimeoutError("下拉列表未出现")
 
 
 def set_visit_type(page, dialog, value):
@@ -171,7 +171,7 @@ def set_visit_time(page, dialog, value):
     try:
         page.wait_for_selector(".el-picker-panel", state="hidden", timeout=1500)
         return
-    except TimeoutError:
+    except PlaywrightTimeoutError:
         pass
     page.locator(
         ".el-picker-panel__footer .el-picker-panel__link-btn:has-text('确定')"
@@ -291,7 +291,7 @@ def set_service_tags(page, dialog, tags_data, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
         section_selector = f".form-section:has-text('{form_title}')"
         try:
             page.wait_for_selector(section_selector, state="visible", timeout=timeout_ms)
-        except TimeoutError:
+        except PlaywrightTimeoutError:
             print(f"警告: 服务标签 {tag} 的 form-section 未出现，跳过", file=sys.stderr)
             continue
         section = service_item.locator(section_selector)
@@ -364,7 +364,7 @@ def set_visit_target(page, dialog, name, address, timeout_ms=PAGE_LOAD_TIMEOUT_M
                 ok = True
             else:
                 last_reason = "status != 200"
-        except TimeoutError:
+        except PlaywrightTimeoutError:
             last_reason = f"{timeout_ms}ms 内未收到响应"
         if ok:
             break
@@ -603,7 +603,7 @@ def close_visit_dialog(page, timeout_ms=5000):
             page.keyboard.press("Escape")
     try:
         page.wait_for_selector(VISIT_DIALOG, state="hidden", timeout=timeout_ms)
-    except TimeoutError:
+    except PlaywrightTimeoutError:
         print("警告: 对话框未能自动关闭", file=sys.stderr)
 
 
@@ -620,7 +620,7 @@ def submit_visit_record(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     if confirm_btn.count() == 0:
         confirm_btn = dialog.locator("button:has-text('确认')")
     if confirm_btn.count() == 0:
-        raise TimeoutError("未找到“确认”按钮")
+        raise PlaywrightTimeoutError("未找到“确认”按钮")
 
     with page.expect_response(
         lambda r: SUBMIT_API in r.url, timeout=timeout_ms
@@ -643,7 +643,7 @@ def submit_visit_record(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     # 保存成功后对话框通常自动关闭；没关闭就关掉它。
     try:
         page.wait_for_selector(VISIT_DIALOG, state="hidden", timeout=5000)
-    except TimeoutError:
+    except PlaywrightTimeoutError:
         close_visit_dialog(page)
     return ok
 
@@ -664,7 +664,7 @@ def main():
         print("请在浏览器中扫描二维码完成登录 ...")
         try:
             final_url = wait_for_login_redirect(page)
-        except TimeoutError as exc:
+        except PlaywrightTimeoutError as exc:
             print(exc, file=sys.stderr)
             browser.close()
             sys.exit(1)
@@ -693,7 +693,7 @@ def main():
                 failed_count += 1
                 print(f"错误: {exc}", file=sys.stderr)
                 close_visit_dialog(page)
-            except TimeoutError as exc:
+            except PlaywrightTimeoutError as exc:
                 failed_count += 1
                 print(f"错误: {exc}", file=sys.stderr)
                 close_visit_dialog(page)
