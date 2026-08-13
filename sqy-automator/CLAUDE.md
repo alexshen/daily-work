@@ -30,6 +30,9 @@ The script opens a visible browser, waits for the user to scan the QR code on
 the `#/login` page, then submits each visit record. `--months` accepts single
 numbers or `from,to` closed ranges and defaults to the current month.
 
+Re-running the script is safe: records already submitted successfully are skipped
+(see the ledger note below).
+
 ### xlsx input format
 
 - One worksheet per month, named `X月` (e.g. `8月`). Missing sheets are a fatal
@@ -56,6 +59,15 @@ numbers or `from,to` closed ranges and defaults to the current month.
   processing continues with the next record.
 - The server is unstable: resident-search requests retry up to 3 times
   (`RESIDENT_SEARCH_RETRIES`), with a 1s interval between attempts.
+- Duplicate submissions are prevented by a local SQLite ledger
+  (`SubmittedLedger`, DB at `~/.sqy_automator.sqlite3` — outside the repo, no
+  `.gitignore` needed). A record's identity is 走访对象 + 居住地址 + 走访时间,
+  normalized the same way as the resident match. A record already in the ledger
+  is skipped before the form dialog even opens; a record is added to the ledger
+  only after a confirmed `status == 200` submit. The ledger must be writable —
+  init failure exits before the browser opens. Known limitation: a submit whose
+  response is lost to a timeout is not recorded, so a re-run re-attempts it (the
+  server may have saved it; that ambiguity is out of scope).
 - Playwright 1.15.3 quirks to keep in mind when editing: use `page.wait_for_selector`
   instead of locator-based waits, `:has-text()` instead of `has_text=`, and
   `all_text_contents()` instead of `all_text`.

@@ -9,6 +9,8 @@ away from the login page and the script proceeds to add the visit record.
 import argparse
 import datetime
 import json
+import os
+import sqlite3
 import sys
 import time
 from itertools import zip_longest
@@ -41,6 +43,8 @@ CONFIRM_BUTTON = "div.el-dialog__footer button:has-text('确认')"  # 对话框�
 BASE_FIELDS = {
     "走访对象", "居住地址", "方式", "走访时间", "参与人员", "走访详情", "服务标签",
 }
+
+LEDGER_DB_NAME = ".sqy_automator.sqlite3"  # 去重台账数据库文件名（放在用户主目录 ~ 下）
 
 
 class RecordSkipped(Exception):
@@ -327,6 +331,57 @@ def normalize_address(s):
     if s.endswith("室"):
         s = s[:-1]
     return s
+
+
+class SubmittedLedger:
+    """SQLite 台账，记录已确认提交成功的走访记录，重跑时用于去重。
+
+    has(record) 在打开表单对话框前检查；add(record) 仅在提交确认成功
+    （saveVisit 响应 status==200）后调用。身份 = (走访对象, 居住地址,
+    走访时间)，归一化方式与选择居民时的匹配一致（去掉全部空白、地址再去掉
+    末尾“室”）。数据库文件放在用户主目录下，避免提交进仓库。
+    """
+
+    def __init__(self, db_path):
+        self._conn = sqlite3.connect(db_path)
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS submitted_visit ("
+            "  visit_target TEXT NOT NULL,"
+            "  address      TEXT NOT NULL,"
+            "  visit_time   TEXT NOT NULL,"
+            "  submitted_at TEXT NOT NULL,"
+            "  PRIMARY KEY (visit_target, address, visit_time))"
+        )
+        self._conn.commit()
+
+    @staticmethod
+    def _key(record):
+        target = record["走访对象"]
+        address = normalize_address(record["居住地址"])
+        visit_time = str(record["走访时间"])  # parse_record 已格式化为 %Y-%m-%d %H:%M:%S
+        return target, address, visit_time
+
+    def has(self, record):
+        target, address, visit_time = self._key(record)
+        row = self._conn.execute(
+            "SELECT 1 FROM submitted_visit "
+            "WHERE visit_target=? AND address=? AND visit_time=?",
+            (target, address, visit_time),
+        ).fetchone()
+        return row is not None
+
+    def add(self, record):
+        target, address, visit_time = self._key(record)
+        submitted_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._conn.execute(
+            "INSERT OR IGNORE INTO submitted_visit "
+            "(visit_target, address, visit_time, submitted_at) VALUES (?, ?, ?, ?)",
+            (target, address, visit_time, submitted_at),
+        )
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
 
 
 def set_visit_target(page, dialog, name, address, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
@@ -656,6 +711,15 @@ def main():
         records = [EXAMPLE_RECORD]
     print(f"共读取 {len(records)} 条记录")
 
+    # 去重台账必须在打开浏览器前初始化：台账不可用时直接失败，绝不降级为“无台账”
+    # 运行（那会悄悄重新引入本功能要避免的重复）。
+    ledger_path = os.path.join(os.path.expanduser("~"), LEDGER_DB_NAME)
+    try:
+        ledger = SubmittedLedger(ledger_path)
+    except sqlite3.Error as exc:
+        print(f"错误: 无法初始化去重台账 {ledger_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         page = browser.new_page()
@@ -676,7 +740,15 @@ def main():
 
         success_count = 0
         failed_count = 0
+        skipped_count = 0
         for i, record in enumerate(records, 1):
+            if ledger.has(record):
+                skipped_count += 1
+                print(
+                    f"第 {i}/{len(records)} 条记录已在台账中，跳过"
+                    f"（走访对象 {record.get('走访对象')}，走访时间 {record.get('走访时间')}）"
+                )
+                continue
             dialog = open_new_record_dialog(page)
             try:
                 fill_visit_record_form(page, dialog, record)
@@ -686,6 +758,7 @@ def main():
                         f"请检查表单，按回车提交并继续..."
                     )
                 if submit_visit_record(page, dialog, record):
+                    ledger.add(record)
                     success_count += 1
                 else:
                     failed_count += 1
@@ -698,7 +771,10 @@ def main():
                 print(f"错误: {exc}", file=sys.stderr)
                 close_visit_dialog(page)
 
-        print(f"共 {len(records)} 条记录：成功 {success_count} 条，失败/跳过 {failed_count} 条")
+        ledger.close()
+
+        print(f"共 {len(records)} 条记录：成功 {success_count} 条，失败/跳过 {failed_count} 条，"
+              f"台账去重跳过 {skipped_count} 条")
         print("浏览器保持打开供检查，按回车退出...")
         input()
         browser.close()
