@@ -160,8 +160,8 @@ def set_join_users(page, dialog, users):
         if name in target and not selected:
             item.click()
 
-    # Close the dropdown by clicking outside it (not Escape — dialogs close on Escape).
-    dialog.locator(".el-dialog__title").click()
+    # Close the dropdown with Escape
+    page.keyboard.press("Escape")
 
     picked = set(form_item.locator(".el-select__tags-text").all_text_contents())
     missing = target - picked
