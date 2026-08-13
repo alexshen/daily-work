@@ -22,8 +22,22 @@ PAGE_LOAD_TIMEOUT_MS = 30_000  # how long to wait for that request to finish
 NEW_RECORD_BUTTON = "button.el-button--primary.filter-item:has-text('新增')"
 VISIT_DIALOG = "div.el-dialog__wrapper.sqVisitDialog"
 
+# 走访对象（选择居民）对话框。teleport 到 <body>，aria-label 唯一，正好区别于
+# 只是包含“选择居民”文字的访客对话框。
+RESIDENT_DIALOG = ".el-dialog[aria-label='选择居民']"
+RESIDENT_SEARCH_INPUT = "input[placeholder='输入用户姓名检索']"
+RESIDENT_SEARCH_BUTTON = "button:has-text('搜索')"
+RESIDENT_SEARCH_API = "/sqy-admin/api/sqReceptionVisit/queryPersonList"
+
+
+class RecordSkipped(Exception):
+    """走访记录因无法填写（如找不到走访对象）而被跳过。"""
+
+
 # 示例记录；运行时可按需修改。参与人员用空格分隔的姓名列表。
 EXAMPLE_RECORD = {
+    "走访对象": "黄曼君",  # 需能在“选择居民”检索框找到的姓名
+    "居住地址": "南大路18弄5号302",  # 可选；重名时用来区分（匹配前去掉全部空白）
     "方式": "走访",  # 需是 方式 下拉框里存在的选项
     "走访时间": "2026-08-12 14:30:00",  # 需与日期时间选择器的格式一致
     "参与人员": "李凯 朱晓庆",  # 空格分隔；姓名需在下拉框里存在
@@ -174,16 +188,90 @@ def set_visit_content(dialog, value):
     _form_item(dialog, "走访详情").locator("textarea").fill(value)
 
 
+def set_visit_target(page, dialog, name, address=None, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
+    """在“走访对象”表单项里选择姓名为 `name` 的居民。
+
+    `address` 可选（记录里的“居住地址”字段），用于在重名结果里精确匹配“地址”列；
+    匹配前把两侧地址里的全部空白去掉。点表单项内的“选择居民”按钮会打开第二个
+    Element UI 对话框（teleport 到 <body>，以 aria-label 区分）。输入姓名并点“搜索”，
+    等 /queryPersonList 响应返回且 JSON status==200（结果数据加密，不解析内容）。
+    查无此人（结果表处于“暂无数据”或匹配不到行）时：关闭对话框、打印错误，并抛
+    RecordSkipped 跳过当前记录。
+    """
+    remove_ws = lambda s: "".join(s.split())
+
+    _form_item(dialog, "走访对象").locator("button:has-text('选择居民')").click()
+    page.wait_for_selector(RESIDENT_DIALOG, state="visible", timeout=timeout_ms)
+    resident_dialog = page.locator(RESIDENT_DIALOG)
+
+    def _skip(reason):
+        resident_dialog.locator(".el-dialog__headerbtn").click()
+        raise RecordSkipped(reason)
+
+    # 结果数据加密，只能判断请求是否成功：以 queryPersonList 响应返回且其 JSON 的
+    # status 字段为 200 作为搜索完成信号（不解析加密的 data）。
+    resident_dialog.locator(RESIDENT_SEARCH_INPUT).fill(name)
+    with page.expect_response(
+        lambda r: RESIDENT_SEARCH_API in r.url, timeout=timeout_ms
+    ) as resp_info:
+        resident_dialog.locator(RESIDENT_SEARCH_BUTTON).click()
+    if resp_info.value.json().get("status") != 200:
+        _skip(f"走访对象搜索请求失败（status != 200），跳过该条记录")
+
+    # 轮询等数据行渲染，按姓名（以及可选的地址）匹配目标行；结果表持续处于
+    # “暂无数据”空状态（tbody 无数据行且空状态文本连续可见）时判为查无此人。
+    rows = resident_dialog.locator("tbody tr")
+    empty_text = resident_dialog.locator(".el-table__empty-text")
+    target_row = None
+    deadline = time.time() + timeout_ms / 1000
+    empty_ticks = 0
+    while time.time() < deadline:
+        for i in range(rows.count()):
+            cells = rows.nth(i).locator("td")
+            if cells.count() < 2:
+                continue  # 防御：仅一列的空态行
+            if cells.nth(0).inner_text().strip() != name:
+                continue
+            if address and remove_ws(cells.nth(2).inner_text()) != remove_ws(address):
+                continue
+            target_row = rows.nth(i)
+            break
+        if target_row is not None:
+            break
+        if rows.count() == 0 and empty_text.count() > 0 and empty_text.first.is_visible():
+            empty_ticks += 1
+            if empty_ticks >= 3:  # 连续约 0.6s 仍为空，判定查无此人
+                break
+        else:
+            empty_ticks = 0
+        time.sleep(0.2)
+    if target_row is None:
+        _skip(f"走访对象 {name} 未找到（暂无数据或没有匹配行），跳过该条记录")
+
+    # 点“操作”列（最后一列）里的“选择”按钮；找不到时退而点该行最后一个按钮。
+    action_btn = target_row.locator("td:last-child button:has-text('选择')")
+    if action_btn.count() == 0:
+        action_btn = target_row.locator("td:last-child button")
+    action_btn.click()
+
+    # 等“选择居民”对话框关闭，再读回已选姓名打印确认。
+    page.wait_for_selector(RESIDENT_DIALOG, state="hidden", timeout=timeout_ms)
+    print(f"已设置走访对象: {_form_item(dialog, '走访对象').inner_text().strip()}")
+
+
 def fill_visit_record_form(page, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     """Fill the open 新增接待走访 dialog from `record`.
 
-    Supported keys: 方式, 走访时间, 参与人员, 走访详情.
-    Keys absent from `record` are left untouched. 走访对象 and 服务内容 are not
-    implemented yet.
+    Supported keys: 走访对象, 居住地址, 方式, 走访时间, 参与人员, 走访详情.
+    走访对象 must come first: if the resident can't be found, RecordSkipped is
+    raised and the remaining fields are left untouched (the record is skipped).
+    Keys absent from `record` are left untouched. 服务内容 is not implemented yet.
     """
     page.wait_for_selector(VISIT_DIALOG, state="visible", timeout=timeout_ms)
     dialog = page.locator(VISIT_DIALOG)
 
+    if "走访对象" in record:
+        set_visit_target(page, dialog, record["走访对象"], record.get("居住地址"))
     if "方式" in record:
         set_visit_type(page, dialog, record["方式"])
     if "走访时间" in record:
@@ -215,7 +303,13 @@ def main():
 
         open_new_record_dialog(page)
 
-        fill_visit_record_form(page, EXAMPLE_RECORD)
+        try:
+            fill_visit_record_form(page, EXAMPLE_RECORD)
+        except RecordSkipped as exc:
+            print(exc, file=sys.stderr)
+            browser.close()
+            sys.exit(1)
+
         print("表单已按示例记录填写，浏览器保持打开供检查")
         input("检查表单填写结果，按回车退出...")
 
