@@ -44,6 +44,19 @@ EXAMPLE_RECORD = {
     "走访时间": "2026-08-12 14:30:00",  # 需与日期时间选择器的格式一致
     "参与人员": "李凯 朱晓庆",  # 空格分隔；姓名需在下拉框里存在
     "走访详情": "上门了解老人近期生活状况。",
+    "服务标签": [
+        { "tag": "困难老年人探访关爱",
+          "探访关爱服务内容": "居家安全服务",
+          "服务时长(小时)": 0 },
+    ]
+}
+
+SERVICE_TAG_FORM_STRUCTURES = {
+    "困难老年人探访关爱": {
+        "form_title": "请填写困难老年人探访关爱服务信息",
+        "探访关爱服务内容" : "checkbox",
+        "服务时长(小时)": "input"
+    }
 }
 
 
@@ -190,6 +203,97 @@ def set_visit_content(dialog, value):
     _form_item(dialog, "走访详情").locator("textarea").fill(value)
 
 
+def _set_checkbox_group(container, values, warn_label):
+    """把 `container` 内的 checkbox 组设为恰好选中 `values` 中的选项。
+
+    `values` 是选项名（空格分隔的字符串）或选项名列表。对每个 `.el-checkbox`：
+    其 `.el-checkbox__label` 文本在目标集合里就选中（已选中则跳过），不在集合里
+    但已选中就取消。请求的选项找不到对应 checkbox 时打印警告。返回实际存在的
+    选项名集合（供调用方判断缺失项）。
+    """
+    target = set(values.split()) if isinstance(values, str) else set(values)
+    boxes = container.locator(".el-checkbox")
+    found = set()
+    for i in range(boxes.count()):
+        box = boxes.nth(i)
+        label = box.locator(".el-checkbox__label").inner_text().strip()
+        checked = "is-checked" in (box.get_attribute("class") or "").split()
+        if label in target:
+            found.add(label)
+            if not checked:
+                box.click()
+        elif checked:
+            box.click()
+    missing = target - found
+    if missing:
+        print(f"警告: {warn_label} 中未找到选项: {sorted(missing)}", file=sys.stderr)
+    return found
+
+
+def _set_component_input(component, value):
+    """填写组件内的输入框（el-input / el-input-number 共用 input.el-input__inner）。"""
+    component.locator("input.el-input__inner").fill(str(value))
+
+
+def set_service_tags(page, dialog, tags_data, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
+    """填写新增接待走访对话框里的 服务标签 及其服务表单。
+
+    `tags_data` 即记录里的“服务标签”列表，每项是一个 dict：`tag` 是服务标签名，
+    其余键是服务表单的字段。先把 tag-section 里的 checkbox 调整为恰好选中数据中
+    的标签（数据里给出但页面没有该 checkbox 的打印警告），再对每个出现的标签按其
+    form-section（用 SERVICE_TAG_FORM_STRUCTURES[tag]["form_title"] 定位）逐字段
+    按声明的类型填写。form-section 只对已勾选的标签渲染，因此必须先调整 tag
+    checkbox。
+    """
+    service_item = _form_item(dialog, "服务标签")
+    tag_section = service_item.locator(".tag-section")
+    tags = [e["tag"] for e in tags_data if isinstance(e, dict) and "tag" in e]
+    found = _set_checkbox_group(tag_section, tags, "服务标签")
+
+    for entry in tags_data:
+        if not isinstance(entry, dict) or "tag" not in entry:
+            print(f"警告: 服务标签项缺少 tag 字段，已跳过: {entry}", file=sys.stderr)
+            continue
+        tag = entry["tag"]
+        if tag not in found:
+            continue  # 缺失 checkbox 的警告已在 _set_checkbox_group 打印
+        structure = SERVICE_TAG_FORM_STRUCTURES.get(tag)
+        if structure is None:
+            print(
+                f"警告: 服务标签 {tag} 未在 SERVICE_TAG_FORM_STRUCTURES 中定义，跳过",
+                file=sys.stderr,
+            )
+            continue
+        form_title = structure["form_title"]
+        section_selector = f".form-section:has-text('{form_title}')"
+        try:
+            page.wait_for_selector(section_selector, state="visible", timeout=timeout_ms)
+        except TimeoutError:
+            print(f"警告: 服务标签 {tag} 的 form-section 未出现，跳过", file=sys.stderr)
+            continue
+        section = service_item.locator(section_selector)
+        for field_name, value in entry.items():
+            if field_name == "tag":
+                continue
+            field_type = structure.get(field_name)
+            if field_type is None:
+                print(
+                    f"警告: 服务标签 {tag} 的字段 {field_name} 未在结构中定义类型，跳过",
+                    file=sys.stderr,
+                )
+                continue
+            component = section.locator(f".component:has-text('{field_name}')")
+            if field_type == "checkbox":
+                _set_checkbox_group(component, value, field_name)
+            elif field_type == "input":
+                _set_component_input(component, value)
+            else:
+                print(
+                    f"警告: 服务标签 {tag} 字段 {field_name} 的未知类型 {field_type}，跳过",
+                    file=sys.stderr,
+                )
+
+
 def normalize_address(s):
     """归一化地址用于比较：去掉全部空白，再去掉末尾单个“室”。
 
@@ -298,11 +402,14 @@ def set_visit_target(page, dialog, name, address, timeout_ms=PAGE_LOAD_TIMEOUT_M
 def fill_visit_record_form(page, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     """Fill the open 新增接待走访 dialog from `record`.
 
-    Supported keys: 走访对象, 居住地址, 方式, 走访时间, 参与人员, 走访详情.
+    Supported keys: 走访对象, 居住地址, 方式, 走访时间, 参与人员, 走访详情,
+    服务标签.
     走访对象 must come first: if the resident can't be found, RecordSkipped is
     raised and the remaining fields are left untouched (the record is skipped).
     走访对象 要求记录里同时提供居住地址（用于在结果表里精确匹配“地址”列）。
-    Keys absent from `record` are left untouched. 服务内容 is not implemented yet.
+    服务标签 是列表，每项含 tag 与对应服务字段；tag 的 checkbox 及每个字段的
+    填写按 SERVICE_TAG_FORM_STRUCTURES 定义的类型进行。
+    Keys absent from `record` are left untouched.
     """
     page.wait_for_selector(VISIT_DIALOG, state="visible", timeout=timeout_ms)
     dialog = page.locator(VISIT_DIALOG)
@@ -317,6 +424,8 @@ def fill_visit_record_form(page, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
         set_join_users(page, dialog, record["参与人员"])
     if "走访详情" in record:
         set_visit_content(dialog, record["走访详情"])
+    if "服务标签" in record:
+        set_service_tags(page, dialog, record["服务标签"])
 
 
 def main():
