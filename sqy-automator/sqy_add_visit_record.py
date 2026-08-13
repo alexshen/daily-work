@@ -416,27 +416,21 @@ def set_visit_target(page, dialog, name, address, timeout_ms=PAGE_LOAD_TIMEOUT_M
 def fill_visit_record_form(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     """Fill the open 新增接待走访 dialog from `record`.
 
-    `dialog` is the locator returned by open_new_record_dialog. Supported keys:
-    走访对象, 居住地址, 方式, 走访时间, 参与人员, 走访详情, 服务标签.
-    走访对象 must come first: if the resident can't be found, RecordSkipped is
-    raised and the remaining fields are left untouched (the record is skipped).
-    走访对象 要求记录里同时提供居住地址（用于在结果表里精确匹配“地址”列）。
-    服务标签 是列表，每项含 tag 与对应服务字段；tag 的 checkbox 及每个字段的
-    填写按 SERVICE_TAG_FORM_STRUCTURES 定义的类型进行。
-    Keys absent from `record` are left untouched.
+    `dialog` is the locator returned by open_new_record_dialog. All required
+    fields (走访对象, 居住地址, 方式, 走访时间, 参与人员, 走访详情) must be
+    present and non-empty; if 走访对象 can't be found, RecordSkipped is raised
+    and the remaining fields are left untouched (the record is skipped). 走访对
+    象 要求记录里提供居住地址（用于在结果表里精确匹配 “地址”列）。
+    服务标签 总是存在（可为空）：空列表表示该条记录没有服务标签，会取消 tag-section
+    里已勾选的标签；非空时是列表，每项含 tag 与对应服务字段；tag 的 checkbox 及
+    每个字段的填写按 SERVICE_TAG_FORM_STRUCTURES 定义的类型进行。
     """
-    if "走访对象" in record:
-        set_visit_target(page, dialog, record["走访对象"], record["居住地址"])
-    if "方式" in record:
-        set_visit_type(page, dialog, record["方式"])
-    if "走访时间" in record:
-        set_visit_time(page, dialog, record["走访时间"])
-    if "参与人员" in record:
-        set_join_users(page, dialog, record["参与人员"])
-    if "走访详情" in record:
-        set_visit_content(dialog, record["走访详情"])
-    if "服务标签" in record:
-        set_service_tags(page, dialog, record["服务标签"])
+    set_visit_target(page, dialog, record["走访对象"], record["居住地址"])
+    set_visit_type(page, dialog, record["方式"])
+    set_visit_time(page, dialog, record["走访时间"])
+    set_join_users(page, dialog, record["参与人员"])
+    set_visit_content(dialog, record["走访详情"])
+    set_service_tags(page, dialog, record["服务标签"])
 
 
 def parse_service_tags(value):
@@ -464,17 +458,20 @@ def parse_service_tags(value):
 def parse_record(raw):
     """把一行原始单元格值整理成 fill_visit_record_form 能用的记录 dict。
 
-    去掉 None / 全空白的值；走访时间 若是 Excel 日期对象则格式化为
+    空值（None 或全空白）保留为空字符串，不丢弃，从而保留“字段存在但为空”的信息：
+    fill_visit_record_form 据此判断——值为空的字段不填写，保持表单原样，且 居住地址
+    为空时不会因键缺失而报错。走访时间 若是 Excel 日期对象则格式化为
     %Y-%m-%d %H:%M:%S 以匹配日期时间选择器的格式；服务标签 经 parse_service_tags
     解析成列表。
     """
     record = {}
     for key, value in raw.items():
         if value is None:
-            continue
-        if isinstance(value, str) and not value.strip():
-            continue
-        record[key] = value
+            record[key] = ""
+        elif isinstance(value, str) and not value.strip():
+            record[key] = ""
+        else:
+            record[key] = value
     if "走访时间" in record and isinstance(record["走访时间"], datetime.datetime):
         record["走访时间"] = record["走访时间"].strftime("%Y-%m-%d %H:%M:%S")
     if "服务标签" in record:
