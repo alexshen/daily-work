@@ -39,7 +39,7 @@ class RecordSkipped(Exception):
 # 示例记录；运行时可按需修改。参与人员用空格分隔的姓名列表。
 EXAMPLE_RECORD = {
     "走访对象": "黄曼君",  # 需能在“选择居民”检索框找到的姓名
-    "居住地址": "南大路18弄5号302",  # 可选；重名时用来区分（匹配前去掉全部空白）
+    "居住地址": "南大路18弄5号302",  # 必填；用于匹配“地址”列（匹配前去掉空白与末尾“室”）
     "方式": "走访",  # 需是 方式 下拉框里存在的选项
     "走访时间": "2026-08-12 14:30:00",  # 需与日期时间选择器的格式一致
     "参与人员": "李凯 朱晓庆",  # 空格分隔；姓名需在下拉框里存在
@@ -190,18 +190,29 @@ def set_visit_content(dialog, value):
     _form_item(dialog, "走访详情").locator("textarea").fill(value)
 
 
-def set_visit_target(page, dialog, name, address=None, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
+def normalize_address(s):
+    """归一化地址用于比较：去掉全部空白，再去掉末尾单个“室”。
+
+    录入的“居住地址”可能有空白、可能以“室”结尾，而搜索结果的“地址”列
+    不带“室”（防御性地同样处理）。
+    """
+    s = "".join(s.split())
+    if s.endswith("室"):
+        s = s[:-1]
+    return s
+
+
+def set_visit_target(page, dialog, name, address, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     """在“走访对象”表单项里选择姓名为 `name` 的居民。
 
-    `address` 可选（记录里的“居住地址”字段），用于在重名结果里精确匹配“地址”列；
-    匹配前把两侧地址里的全部空白去掉。点表单项内的“选择居民”按钮会打开第二个
+    `address` 必填（记录里的“居住地址”字段，预期非空），用于在重名结果里精确
+    匹配“地址”列；匹配前对两侧地址做归一化（去掉全部空白与末尾单个“室”）。
+    点表单项内的“选择居民”按钮会打开第二个
     Element UI 对话框（teleport 到 <body>，以 aria-label 区分）。输入姓名并点“搜索”，
     等 /queryPersonList 响应返回且 JSON status==200（结果数据加密，不解析内容）。
     查无此人（结果表处于“暂无数据”或匹配不到行）时：关闭对话框、打印错误，并抛
     RecordSkipped 跳过当前记录。
     """
-    remove_ws = lambda s: "".join(s.split())
-
     _form_item(dialog, "走访对象").locator("button:has-text('选择居民')").click()
     page.wait_for_selector(RESIDENT_DIALOG, state="visible", timeout=timeout_ms)
     resident_dialog = page.locator(RESIDENT_DIALOG)
@@ -257,7 +268,7 @@ def set_visit_target(page, dialog, name, address=None, timeout_ms=PAGE_LOAD_TIME
                 continue  # 防御：仅一列的空态行
             if cells.nth(0).inner_text().strip() != name:
                 continue
-            if address and remove_ws(cells.nth(2).inner_text()) != remove_ws(address):
+            if normalize_address(cells.nth(2).inner_text()) != normalize_address(address):
                 continue
             target_row = rows.nth(i)
             break
@@ -290,13 +301,14 @@ def fill_visit_record_form(page, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     Supported keys: 走访对象, 居住地址, 方式, 走访时间, 参与人员, 走访详情.
     走访对象 must come first: if the resident can't be found, RecordSkipped is
     raised and the remaining fields are left untouched (the record is skipped).
+    走访对象 要求记录里同时提供居住地址（用于在结果表里精确匹配“地址”列）。
     Keys absent from `record` are left untouched. 服务内容 is not implemented yet.
     """
     page.wait_for_selector(VISIT_DIALOG, state="visible", timeout=timeout_ms)
     dialog = page.locator(VISIT_DIALOG)
 
     if "走访对象" in record:
-        set_visit_target(page, dialog, record["走访对象"], record.get("居住地址"))
+        set_visit_target(page, dialog, record["走访对象"], record["居住地址"])
     if "方式" in record:
         set_visit_type(page, dialog, record["方式"])
     if "走访时间" in record:
