@@ -185,7 +185,7 @@ def open_new_record_dialog(page, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     """
     page.locator(NEW_RECORD_BUTTON).click()
     page.wait_for_selector(VISIT_DIALOG, state="visible", timeout=timeout_ms)
-    logger.info("新增对话框已打开")
+    logger.debug("新增对话框已打开")
     return page.locator(VISIT_DIALOG)
 
 
@@ -532,7 +532,7 @@ def set_visit_target(page, dialog, name, address, timeout_ms=PAGE_LOAD_TIMEOUT_M
 
     # 等“选择居民”对话框关闭，再读回已选姓名打印确认。
     page.wait_for_selector(RESIDENT_DIALOG, state="hidden", timeout=timeout_ms)
-    logger.info(f"已设置走访对象: {_form_item(dialog, '走访对象').inner_text().strip()}")
+    logger.debug(f"已设置走访对象: {_form_item(dialog, '走访对象').inner_text().strip()}")
 
 
 def fill_visit_record_form(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
@@ -754,7 +754,7 @@ def submit_visit_record(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     except ValueError:
         status = None
     if status == 200:
-        logger.info("提交成功")
+        logger.debug("提交成功")
         ok = True
     else:
         logger.error(
