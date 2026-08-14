@@ -29,11 +29,16 @@ python sqy_add_visit_record.py                                  # submit the bui
 python sqy_add_visit_record.py -i records.xlsx                  # read records from an xlsx file
 python sqy_add_visit_record.py -i records.xlsx --months 8 12    # only the 8月 and 12月 sheets
 python sqy_add_visit_record.py -i records.xlsx --confirm        # pause between records for manual check
+python sqy_add_visit_record.py -i records.xlsx --no-tui         # plain scrolling log instead of the TUI
 ```
 
 The script opens a visible browser, waits for the user to scan the QR code on
 the `#/login` page, then submits each visit record. `--months` accepts single
 numbers or `from,to` closed ranges and defaults to the current month.
+
+`--no-tui` forces the plain scrolling-log fallback (also the automatic default on
+classic Windows consoles like Windows 7 cmd, where Rich cannot redraw the
+full-screen TUI in place — see the Rich TUI section below).
 
 Re-running the script is safe: records already submitted successfully are skipped
 (see the ledger note below).
@@ -107,3 +112,11 @@ Key behaviors to preserve when editing:
 - The two user pauses (`--confirm`, final keep-browser-open) go through
   `AppUI.pause()`, which renders the prompt in-frame and blocks on an
   echo-off Enter read without stopping/restarting the `Live`.
+- **Plain mode**: when `AppUI._use_live` is false — classic Windows consoles
+  (Rich's `console.legacy_windows`, e.g. Windows 7 cmd, where the full-screen
+  `Live` redraw scrolls the screen on every refresh) or `--no-tui` — the `Live`
+  is never started. Log records then fall through to the real stdout/stderr via
+  `UIHandler`'s fallback write, `begin_processing`/`advance` log their own
+  lines, and `pause()` prints its prompt. All gating and refresh calls key off
+  `_use_live`, never `console.is_terminal` (a legacy Windows terminal has
+  `is_terminal` True while no `Live` is running).

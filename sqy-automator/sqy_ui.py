@@ -153,7 +153,7 @@ def _wait_enter():
 class AppUI:
     """Owns the Console, the Live display, the Progress, and the stage state."""
 
-    def __init__(self, refresh_per_second=8.0):
+    def __init__(self, refresh_per_second=8.0, force_plain=False):
         # State first: Live.__init__ calls get_renderable() once.
         self._stage = "login"  # "login" | "processing" | "completed"
         self._status_text = ""
@@ -162,6 +162,10 @@ class AppUI:
         self._task_id = None
         self._file_handler = None
         self._logger = None
+        # force_plain is public so the CLI can set it after parse_args() (see
+        # _use_live). _progress_total backs the plain-mode "进度: i/N" lines.
+        self.force_plain = bool(force_plain)
+        self._progress_total = 0
         # One Spinner instance reused across frames: Rich's Spinner advances by
         # elapsed time since its first render, so creating a fresh instance per
         # frame would pin it to glyph 0 and freeze the animation.
@@ -197,21 +201,41 @@ class AppUI:
         )
 
     @property
+    def _use_live(self):
+        """True when the full-screen Live should run.
+
+        False on classic Windows consoles (no VT processing, e.g. Windows 7
+        cmd), where Rich cannot redraw the Live in place and every refresh
+        scrolls the screen — there we fall back to plain append-only log
+        output. Also forced off by ``force_plain``.
+        """
+        return bool(
+            self.console.is_terminal
+            and not self.console.legacy_windows
+            and not self.force_plain
+        )
+
+    @property
     def active(self):
-        return bool(self.console.is_terminal and self._live.is_started)
+        return bool(self._use_live and self._live.is_started)
 
     # -- stage transitions -------------------------------------------------
 
     def set_status(self, text):
         self._status_text = text
-        if self.console.is_terminal:
+        if self._use_live:
             self._live.refresh()
+        # Plain mode: no output here — callers pair set_status with a
+        # logger.info of the same message, so emitting would double-print.
 
     def begin_processing(self, total):
         self._stage = "processing"
         self._task_id = self._progress.add_task("Processing", total=total, completed=0)
-        if self.console.is_terminal:
+        self._progress_total = total
+        if self._use_live:
             self._live.refresh()
+        elif self._logger is not None:
+            self._logger.info(f"开始处理 {total} 条记录")
 
     def advance(self, completed):
         if self._task_id is None:
@@ -220,23 +244,34 @@ class AppUI:
         # mutates task state. The buffer lock is not held here, so calling
         # live.refresh() afterwards is safe (no lock-ordering cycle).
         self._progress.update(self._task_id, completed=completed, refresh=False)
-        if self.console.is_terminal:
+        if self._use_live:
             self._live.refresh()
+        elif self._logger is not None:
+            # Per-record: successful submits aren't logged by the caller, so
+            # this is the only progress feedback in plain mode.
+            self._logger.info(f"进度: {completed}/{self._progress_total}")
 
     def show_completed(self, summary):
         self._stage = "completed"
         self._summary_text = summary
-        if self.console.is_terminal:
+        if self._use_live:
             self._live.refresh()
+        # Plain mode: no output here — main() logs the summary just before
+        # calling this.
 
     def pause(self, prompt):
-        """Show a prompt in the frame and block until the user presses Enter.
+        """Show a prompt and block until the user presses Enter.
 
-        The Live is never stopped/restarted here, so the frame never scrolls
-        and the auto-refresh thread is not respawned.
+        In the TUI the prompt is rendered in-frame; the Live is never
+        stopped/restarted here, so the frame never scrolls and the
+        auto-refresh thread is not respawned. In plain mode the prompt is
+        printed as a normal line (branching on ``_use_live`` rather than
+        ``console.is_terminal`` matters: on a legacy Windows terminal
+        ``is_terminal`` is True even though no Live is running, so the old
+        branch would wait without ever showing the prompt).
         """
         self._pause_prompt = prompt
-        if self.console.is_terminal:
+        if self._use_live:
             self._live.refresh()
             _wait_enter()
         else:
@@ -274,7 +309,7 @@ class AppUI:
     # -- lifecycle ---------------------------------------------------------
 
     def __enter__(self):
-        if self.console.is_terminal:
+        if self._use_live:
             self._live.start(refresh=True)
         return self
 

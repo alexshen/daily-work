@@ -632,6 +632,11 @@ def parse_args(argv=None):
         action="store_true",
         help="每填完一条记录后暂停，按回车确认后再提交并继续下一条",
     )
+    parser.add_argument(
+        "--no-tui",
+        action="store_true",
+        help="不使用全屏 TUI，改用普通滚动日志（兼容 Windows 7 传统 cmd 控制台）",
+    )
     args = parser.parse_args(argv)
     args.months = parse_months(args.months)
     return args
@@ -704,6 +709,7 @@ def main():
     ui.setup_logging(logger)
     try:
         args = parse_args()
+        ui.force_plain = args.no_tui
         with ui:
             if args.input:
                 records = read_visit_records(args.input, args.months)
