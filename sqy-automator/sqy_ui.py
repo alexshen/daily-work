@@ -69,8 +69,9 @@ class LogBuffer:
 
         Wrapping is delegated to Rich's ``Text.wrap``, so long messages and CJK
         double-width characters occupy exactly the terminal cells they will
-        render in. Fewer lines than ``height`` are blank-padded at the top so
-        the newest log always sits at the bottom (auto-scroll to the tail).
+        render in. Fewer lines than ``height`` are blank-padded at the bottom so
+        the log starts at the top of the viewport and grows downward; once the
+        viewport overflows, the tail (newest at the bottom) is still shown.
         """
         if height <= 0:
             return []
@@ -83,7 +84,7 @@ class LogBuffer:
             lines = self._lines
             if len(lines) >= height:
                 return lines[-height:]
-            return [Text("")] * (height - len(lines)) + lines
+            return lines + [Text("")] * (height - len(lines))
 
 
 class UIHandler(logging.Handler):
