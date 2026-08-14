@@ -9,6 +9,7 @@ away from the login page and the script proceeds to add the visit record.
 import argparse
 import datetime
 import json
+import logging
 import os
 import sqlite3
 import sys
@@ -17,6 +18,10 @@ from itertools import zip_longest
 
 from openpyxl import load_workbook
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+
+from sqy_ui import AppUI
+
+logger = logging.getLogger(__name__)
 
 LOGIN_URL = "https://jczl.sh.cegn.cn/web/#/login"
 LOGIN_HASH = "#/login"
@@ -120,7 +125,7 @@ def open_new_record_dialog(page, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     """
     page.locator(NEW_RECORD_BUTTON).click()
     page.wait_for_selector(VISIT_DIALOG, state="visible", timeout=timeout_ms)
-    print("新增对话框已打开")
+    logger.info("新增对话框已打开")
     return page.locator(VISIT_DIALOG)
 
 
@@ -225,7 +230,7 @@ def set_join_users(page, dialog, users):
     picked = set(form_item.locator(".el-select__tags-text").all_text_contents())
     missing = target - picked
     if missing:
-        print(f"警告: 参与人员下拉中未找到/未选中: {missing}", file=sys.stderr)
+        logger.warning(f"参与人员下拉中未找到/未选中: {missing}")
 
 
 def set_visit_content(dialog, value):
@@ -256,7 +261,7 @@ def _set_checkbox_group(container, values, warn_label):
             box.click()
     missing = target - found
     if missing:
-        print(f"警告: {warn_label} 中未找到选项: {sorted(missing)}", file=sys.stderr)
+        logger.warning(f"{warn_label} 中未找到选项: {sorted(missing)}")
     return found
 
 
@@ -282,24 +287,21 @@ def set_service_tags(page, dialog, tags_data, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
 
     for entry in tags_data:
         if not isinstance(entry, dict) or "tag" not in entry:
-            print(f"警告: 服务标签项缺少 tag 字段，已跳过: {entry}", file=sys.stderr)
+            logger.warning(f"服务标签项缺少 tag 字段，已跳过: {entry}")
             continue
         tag = entry["tag"]
         if tag not in found:
             continue  # 缺失 checkbox 的警告已在 _set_checkbox_group 打印
         structure = SERVICE_TAG_FORM_STRUCTURES.get(tag)
         if structure is None:
-            print(
-                f"警告: 服务标签 {tag} 未在 SERVICE_TAG_FORM_STRUCTURES 中定义，跳过",
-                file=sys.stderr,
-            )
+            logger.warning(f"服务标签 {tag} 未在 SERVICE_TAG_FORM_STRUCTURES 中定义，跳过")
             continue
         form_title = structure["form_title"]
         section_selector = f".form-section:has-text('{form_title}')"
         try:
             page.wait_for_selector(section_selector, state="visible", timeout=timeout_ms)
         except PlaywrightTimeoutError:
-            print(f"警告: 服务标签 {tag} 的 form-section 未出现，跳过", file=sys.stderr)
+            logger.warning(f"服务标签 {tag} 的 form-section 未出现，跳过")
             continue
         section = service_item.locator(section_selector)
         for field_name, value in entry.items():
@@ -307,10 +309,7 @@ def set_service_tags(page, dialog, tags_data, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
                 continue
             field_type = structure.get(field_name)
             if field_type is None:
-                print(
-                    f"警告: 服务标签 {tag} 的字段 {field_name} 未在结构中定义类型，跳过",
-                    file=sys.stderr,
-                )
+                logger.warning(f"服务标签 {tag} 的字段 {field_name} 未在结构中定义类型，跳过")
                 continue
             component = section.locator(f".component:has-text('{field_name}')")
             if field_type == "checkbox":
@@ -318,10 +317,7 @@ def set_service_tags(page, dialog, tags_data, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
             elif field_type == "input":
                 _set_component_input(component, value)
             else:
-                print(
-                    f"警告: 服务标签 {tag} 字段 {field_name} 的未知类型 {field_type}，跳过",
-                    file=sys.stderr,
-                )
+                logger.warning(f"服务标签 {tag} 字段 {field_name} 的未知类型 {field_type}，跳过")
 
 
 def normalize_address(s):
@@ -427,10 +423,9 @@ def set_visit_target(page, dialog, name, address, timeout_ms=PAGE_LOAD_TIMEOUT_M
         if ok:
             break
         if attempt < RESIDENT_SEARCH_RETRIES:
-            print(
+            logger.warning(
                 f"走访对象搜索第 {attempt} 次失败（{last_reason}），"
-                f"{RESIDENT_SEARCH_RETRY_INTERVAL}s 后重试 ...",
-                file=sys.stderr,
+                f"{RESIDENT_SEARCH_RETRY_INTERVAL}s 后重试 ..."
             )
             time.sleep(RESIDENT_SEARCH_RETRY_INTERVAL)
     else:
@@ -477,7 +472,7 @@ def set_visit_target(page, dialog, name, address, timeout_ms=PAGE_LOAD_TIMEOUT_M
 
     # 等“选择居民”对话框关闭，再读回已选姓名打印确认。
     page.wait_for_selector(RESIDENT_DIALOG, state="hidden", timeout=timeout_ms)
-    print(f"已设置走访对象: {_form_item(dialog, '走访对象').inner_text().strip()}")
+    logger.info(f"已设置走访对象: {_form_item(dialog, '走访对象').inner_text().strip()}")
 
 
 def fill_visit_record_form(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
@@ -513,8 +508,7 @@ def parse_service_tags(value):
         try:
             parsed = json.loads(text)
         except json.JSONDecodeError as exc:
-            print(f"警告: 服务标签 JSON 解析失败（{exc}），返回空列表",
-                  file=sys.stderr)
+            logger.warning(f"服务标签 JSON 解析失败（{exc}），返回空列表")
             return []
         if isinstance(parsed, dict):
             parsed = [parsed]
@@ -556,22 +550,20 @@ def read_visit_records(path, months):
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
     except FileNotFoundError:
-        print(f"错误: 找不到文件 {path}", file=sys.stderr)
+        logger.error(f"找不到文件 {path}")
         sys.exit(1)
     records = []
     for month in months:
         title = f"{month}月"
         if title not in wb.sheetnames:
-            print(f"错误: 工作表 {title} 不存在，可用工作表: {wb.sheetnames}",
-                  file=sys.stderr)
+            logger.error(f"工作表 {title} 不存在，可用工作表: {wb.sheetnames}")
             sys.exit(1)
         ws = wb[title]
         rows = ws.iter_rows(values_only=True)
         header = [(str(c).strip() if c is not None else "") for c in next(rows, ())]
         for col in header:
             if col and col not in BASE_FIELDS:
-                print(f"警告: 工作表 {title} 的列 {col} 不是示例记录的字段，将被忽略",
-                      file=sys.stderr)
+                logger.warning(f"工作表 {title} 的列 {col} 不是示例记录的字段，将被忽略")
         for row in rows:
             raw = {}
             for col, value in zip_longest(header, row):
@@ -587,10 +579,10 @@ def _valid_month(text):
     try:
         m = int(text)
     except ValueError:
-        print(f"错误: 月份参数不是数字: {text}", file=sys.stderr)
+        logger.error(f"月份参数不是数字: {text}")
         sys.exit(1)
     if not 1 <= m <= 12:
-        print(f"错误: 月份超出范围 1-12: {text}", file=sys.stderr)
+        logger.error(f"月份超出范围 1-12: {text}")
         sys.exit(1)
     return m
 
@@ -610,11 +602,11 @@ def parse_months(raw_values):
         elif len(parts) == 2:
             lo, hi = _valid_month(parts[0]), _valid_month(parts[1])
             if lo > hi:
-                print(f"错误: 月份区间 {item} 的起始月大于结束月", file=sys.stderr)
+                logger.error(f"月份区间 {item} 的起始月大于结束月")
                 sys.exit(1)
             months.update(range(lo, hi + 1))
         else:
-            print(f"错误: 无法识别的月份参数: {item}", file=sys.stderr)
+            logger.error(f"无法识别的月份参数: {item}")
             sys.exit(1)
     return sorted(months)
 
@@ -662,7 +654,7 @@ def close_visit_dialog(page, timeout_ms=5000):
     try:
         page.wait_for_selector(VISIT_DIALOG, state="hidden", timeout=timeout_ms)
     except PlaywrightTimeoutError:
-        print("警告: 对话框未能自动关闭", file=sys.stderr)
+        logger.warning("对话框未能自动关闭")
 
 
 def submit_visit_record(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
@@ -691,11 +683,12 @@ def submit_visit_record(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     except ValueError:
         status = None
     if status == 200:
-        print("提交成功")
+        logger.info("提交成功")
         ok = True
     else:
-        print(f"错误: 保存请求失败（status={status}），记录: {record.get('走访对象')}",
-              file=sys.stderr)
+        logger.error(
+            f"保存请求失败（status={status}），记录: {record.get('走访对象')}"
+        )
         ok = False
 
     # 保存成功后对话框通常自动关闭；没关闭就关掉它。
@@ -707,80 +700,102 @@ def submit_visit_record(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
 
 
 def main():
-    args = parse_args()
-    if args.input:
-        records = read_visit_records(args.input, args.months)
-    else:
-        records = [EXAMPLE_RECORD]
-    print(f"共读取 {len(records)} 条记录")
-
-    # 去重台账必须在打开浏览器前初始化：台账不可用时直接失败，绝不降级为“无台账”
-    # 运行（那会悄悄重新引入本功能要避免的重复）。
-    ledger_path = os.path.join(os.path.expanduser("~"), LEDGER_DB_NAME)
+    ui = AppUI()
+    ui.setup_logging(logger)
     try:
-        ledger = SubmittedLedger(ledger_path)
-    except sqlite3.Error as exc:
-        print(f"错误: 无法初始化去重台账 {ledger_path}: {exc}", file=sys.stderr)
-        sys.exit(1)
+        args = parse_args()
+        with ui:
+            if args.input:
+                records = read_visit_records(args.input, args.months)
+            else:
+                records = [EXAMPLE_RECORD]
+            logger.info(f"共读取 {len(records)} 条记录")
+            ui.set_status(f"共读取 {len(records)} 条记录")
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        page = browser.new_page()
-        page.goto(LOGIN_URL)
-
-        print("请在浏览器中扫描二维码完成登录 ...")
-        try:
-            final_url = wait_for_login_redirect(page)
-        except PlaywrightTimeoutError as exc:
-            print(exc, file=sys.stderr)
-            browser.close()
-            sys.exit(1)
-
-        print(f"登录成功，已跳转到: {final_url}")
-
-        resp = wait_for_visit_record_data(page)
-        print(f"已进入平台，{DATA_API} 返回状态码: {resp.status}")
-
-        success_count = 0
-        failed_count = 0
-        skipped_count = 0
-        for i, record in enumerate(records, 1):
-            if ledger.has(record):
-                skipped_count += 1
-                print(
-                    f"第 {i}/{len(records)} 条记录已在台账中，跳过"
-                    f"（走访对象 {record.get('走访对象')}，走访时间 {record.get('走访时间')}）"
-                )
-                continue
-            dialog = open_new_record_dialog(page)
+            # 去重台账必须在打开浏览器前初始化：台账不可用时直接失败，绝不降级为“无台账”
+            # 运行（那会悄悄重新引入本功能要避免的重复）。
+            ledger_path = os.path.join(os.path.expanduser("~"), LEDGER_DB_NAME)
+            logger.info("正在初始化去重台账...")
+            ui.set_status("正在初始化去重台账...")
             try:
-                fill_visit_record_form(page, dialog, record)
-                if args.confirm:
-                    input(
-                        f"已填写第 {i}/{len(records)} 条记录，"
-                        f"请检查表单，按回车提交并继续..."
-                    )
-                if submit_visit_record(page, dialog, record):
-                    ledger.add(record)
-                    success_count += 1
-                else:
-                    failed_count += 1
-            except RecordSkipped as exc:
-                failed_count += 1
-                print(f"错误: {exc}", file=sys.stderr)
-                close_visit_dialog(page)
-            except PlaywrightTimeoutError as exc:
-                failed_count += 1
-                print(f"错误: {exc}", file=sys.stderr)
-                close_visit_dialog(page)
+                ledger = SubmittedLedger(ledger_path)
+            except sqlite3.Error as exc:
+                logger.error(f"无法初始化去重台账 {ledger_path}: {exc}")
+                sys.exit(1)
 
-        ledger.close()
+            logger.info("正在启动浏览器...")
+            ui.set_status("正在启动浏览器...")
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=False)
+                page = browser.new_page()
+                page.goto(LOGIN_URL)
 
-        print(f"共 {len(records)} 条记录：成功 {success_count} 条，失败/跳过 {failed_count} 条，"
-              f"台账去重跳过 {skipped_count} 条")
-        print("浏览器保持打开供检查，按回车退出...")
-        input()
-        browser.close()
+                logger.info("请在浏览器中扫描二维码完成登录 ...")
+                ui.set_status("请在浏览器中扫描二维码完成登录 ...")
+                try:
+                    final_url = wait_for_login_redirect(page)
+                except PlaywrightTimeoutError as exc:
+                    logger.error(str(exc))
+                    browser.close()
+                    sys.exit(1)
+
+                logger.info(f"登录成功，已跳转到: {final_url}")
+                ui.set_status(f"登录成功，已跳转到: {final_url}")
+
+                ui.set_status("正在加载走访登记平台...")
+                resp = wait_for_visit_record_data(page)
+                logger.info(f"已进入平台，{DATA_API} 返回状态码: {resp.status}")
+
+                ui.begin_processing(len(records))
+
+                success_count = 0
+                failed_count = 0
+                skipped_count = 0
+                for i, record in enumerate(records, 1):
+                    if ledger.has(record):
+                        skipped_count += 1
+                        logger.info(
+                            f"第 {i}/{len(records)} 条记录已在台账中，跳过"
+                            f"（走访对象 {record.get('走访对象')}，"
+                            f"走访时间 {record.get('走访时间')}）"
+                        )
+                        ui.advance(i)
+                        continue
+                    dialog = open_new_record_dialog(page)
+                    try:
+                        fill_visit_record_form(page, dialog, record)
+                        if args.confirm:
+                            ui.pause(
+                                f"已填写第 {i}/{len(records)} 条记录，"
+                                f"请检查表单，按回车提交并继续..."
+                            )
+                        if submit_visit_record(page, dialog, record):
+                            ledger.add(record)
+                            success_count += 1
+                        else:
+                            failed_count += 1
+                    except RecordSkipped as exc:
+                        failed_count += 1
+                        logger.error(str(exc))
+                        close_visit_dialog(page)
+                    except PlaywrightTimeoutError as exc:
+                        failed_count += 1
+                        logger.error(str(exc))
+                        close_visit_dialog(page)
+                    ui.advance(i)
+
+                ledger.close()
+
+                summary = (
+                    f"共 {len(records)} 条记录：成功 {success_count} 条，"
+                    f"失败/跳过 {failed_count} 条，台账去重跳过 {skipped_count} 条"
+                )
+                logger.info(summary)
+                ui.show_completed(summary)
+                ui.pause("浏览器保持打开供检查，按回车退出...")
+                browser.close()
+    finally:
+        ui.close()
 
 
 if __name__ == "__main__":

@@ -16,6 +16,11 @@ Install the requirements by `pip install -r requirements.txt`:
 
 - pyee: 8.2.2
 - openpyxl: 3.1.5
+- rich: 14.3.4
+  The Rich TUI (`sqy_ui.py`) uses `Live(get_renderable=...)`, `Text.wrap`,
+  and `Progress.get_renderable()` — all present in 14.3.4. Don't reach for APIs
+  added after it (e.g. `live.update` on a `get_renderable` Live, `Task`-level
+  wait helpers).
 
 ## Usage
 
@@ -71,3 +76,34 @@ Re-running the script is safe: records already submitted successfully are skippe
 - Playwright 1.15.3 quirks to keep in mind when editing: use `page.wait_for_selector`
   instead of locator-based waits, `:has-text()` instead of `has_text=`, and
   `all_text_contents()` instead of `all_text`.
+
+## Rich TUI (`sqy_ui.py`)
+
+The CLI is a three-stage full-screen Rich TUI driven by `AppUI` from
+`sqy_ui.py`:
+
+- **login**: a `Spinner` + status text at the top, log below (no progress).
+- **processing**: a `Progress` bar fixed at the top, log below.
+- **completed**: `✓ Processing completed` + a summary line at the top, the log
+  retained.
+
+Key behaviors to preserve when editing:
+
+- Business code emits logs via the module logger
+  (`logger.info/warning/error`) — there must be no `print()` added for UI
+  purposes.
+- The log region is a **fixed-height viewport showing only the tail** of the
+  full log history. Full history is kept in memory (`LogBuffer`) and mirrored
+  to `~/.sqy_add_visit_record.log` (UTF-8, append). Terminal resizing
+  recomputes the viewport height live and must never discard history; log
+  output must never scroll the terminal.
+- Log lines are wrapped with Rich `Text.wrap` (CJK cell-accurate), so one log
+  message may span several terminal rows.
+- `AppUI.setup_logging(logger)` configures the logger (level INFO,
+  `propagate=False`) with the TUI handler + the file handler. It runs before
+  `parse_args()` so early fatal errors still reach the real stderr.
+- Concurrency rule: the auto-refresh thread holds `Live._lock` while rendering,
+  so `live.refresh()` must never be called while holding the `LogBuffer` lock.
+- The two user pauses (`--confirm`, final keep-browser-open) go through
+  `AppUI.pause()`, which renders the prompt in-frame and blocks on an
+  echo-off Enter read without stopping/restarting the `Live`.
