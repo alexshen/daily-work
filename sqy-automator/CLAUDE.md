@@ -35,6 +35,7 @@ python sqy_add_visit_record.py -i records.xlsx                  # read records f
 python sqy_add_visit_record.py -i records.xlsx --months 8 12    # only the 8月 and 12月 sheets
 python sqy_add_visit_record.py -i records.xlsx --confirm        # pause between records for manual check
 python sqy_add_visit_record.py -i records.xlsx --no-tui         # plain scrolling log instead of the TUI
+python sqy_add_visit_record.py --fake-browser                   # no browser; in-memory fake, for headless UI checks
 ```
 
 The script opens a visible browser, waits for the user to scan the QR code on
@@ -44,6 +45,11 @@ numbers or `from,to` closed ranges and defaults to the current month.
 `--no-tui` forces the plain scrolling-log fallback (also the automatic default on
 classic Windows consoles like Windows 7 cmd, where Rich cannot redraw the
 full-screen TUI in place — see the Rich TUI section below).
+
+`--fake-browser` runs the full flow (xlsx -> ledger -> TUI) against an in-memory
+fake driver instead of a real browser, so the three-stage TUI can be exercised on
+a headless server with no display. Fake runs use an in-memory dedup ledger, so
+they never touch the real `~/.sqy_automator.sqlite3`.
 
 Re-running the script is safe: records already submitted successfully are skipped
 (see the ledger note below).

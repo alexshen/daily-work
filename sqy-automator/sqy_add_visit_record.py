@@ -15,6 +15,7 @@ import sqlite3
 import sys
 import time
 from itertools import zip_longest
+from typing import Callable, Optional, Protocol
 
 from openpyxl import load_workbook
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
@@ -54,6 +55,65 @@ LEDGER_DB_NAME = ".sqy_automator.sqlite3"  # 去重台账数据库文件名（�
 
 class RecordSkipped(Exception):
     """走访记录因无法填写（如找不到走访对象）而被跳过。"""
+
+
+class DriverError(Exception):
+    """驱动层（浏览器/网络）失败的基类；真实实现把 Playwright 异常包装成它。"""
+
+
+class LoginTimeout(DriverError):
+    """二维码登录在超时时间内未完成。"""
+
+
+class VisitRecordDriver(Protocol):
+    """抽象 sqy 的三个处理阶段，使 main() 完全不接触浏览器。
+
+    两个实现：
+      - PlaywrightVisitRecordDriver：包装本模块已有的 Playwright 辅助函数。
+      - FakeVisitRecordDriver：内存假实现，用于无桌面会话的服务器上以
+        --fake-browser 跑完整流程（xlsx -> 台账 -> TUI）供人工核对。
+    """
+
+    def login(self, timeout_seconds: int = LOGIN_TIMEOUT_SECONDS) -> str:
+        """打开登录页并等待二维码扫描完成。
+
+        等价于 page.goto(LOGIN_URL) + wait_for_login_redirect(page)。
+        返回登录成功后的跳转 URL（其 hash 不再等于 LOGIN_HASH）。
+        超时抛 LoginTimeout。
+        """
+        ...
+
+    def load_visit_record_page(self, timeout_ms: int = PAGE_LOAD_TIMEOUT_MS) -> int:
+        """进入走访登记平台并等待其数据请求完成。
+
+        等价于 wait_for_visit_record_data(page)。返回 DATA_API 响应的
+        HTTP 状态码。浏览器/网络失败抛 DriverError。
+        """
+        ...
+
+    def submit_record(
+        self,
+        record: dict,
+        before_submit: Optional[Callable[[], None]] = None,
+    ) -> bool:
+        """打开“新增”对话框，按 record 填写，若给定了 before_submit 则在填完、
+        提交前调用它，然后提交。
+
+        返回 True 表示确认成功（status==200）；False 表示服务端拒绝保存。
+        走访对象找不到时抛 RecordSkipped（原样透传）；其他浏览器/网络失败抛
+        DriverError。无论成功、失败或异常，对话框都会被清理（关闭）。
+        """
+        ...
+
+    def close(self) -> None:
+        """释放浏览器/后端资源。幂等，可重复调用。"""
+        ...
+
+    def __enter__(self) -> "VisitRecordDriver":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
 
 
 # 示例记录；运行时可按需修改。参与人员用空格分隔的姓名列表。
@@ -637,6 +697,12 @@ def parse_args(argv=None):
         action="store_true",
         help="不使用全屏 TUI，改用普通滚动日志（兼容 Windows 7 传统 cmd 控制台）",
     )
+    parser.add_argument(
+        "--fake-browser",
+        action="store_true",
+        help="不启动真实浏览器，改用内存假驱动跑完整流程（适用于无桌面会话的服务器，"
+             "在无浏览器的情况下核对 xlsx -> 台账 -> TUI 流程）",
+    )
     args = parser.parse_args(argv)
     args.months = parse_months(args.months)
     return args
@@ -704,6 +770,148 @@ def submit_visit_record(page, dialog, record, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
     return ok
 
 
+class PlaywrightVisitRecordDriver:
+    """真实驱动：持有 sync_playwright()/browser/page 生命周期，并调用本模块
+    已有的浏览器辅助函数（不改动它们）。
+
+    浏览器在第一次调用阶段方法时才惰性启动（_ensure_started），close() 幂等，
+    因此既能在成功路径也能在异常路径被可靠关闭。调用方用
+    ``with create_driver(args) as driver:`` 管理生命周期。
+    """
+
+    def __init__(self, headless=False):
+        self._headless = headless
+        self._playwright = None
+        self._browser = None
+        self._page = None
+
+    def _ensure_started(self):
+        if self._page is not None:
+            return
+        self._playwright = sync_playwright().start()
+        try:
+            self._browser = self._playwright.chromium.launch(headless=self._headless)
+            self._page = self._browser.new_page()
+        except Exception:
+            self.close()
+            raise
+
+    def login(self, timeout_seconds=LOGIN_TIMEOUT_SECONDS):
+        self._ensure_started()
+        self._page.goto(LOGIN_URL)
+        try:
+            return wait_for_login_redirect(self._page, timeout_seconds=timeout_seconds)
+        except PlaywrightTimeoutError as exc:
+            raise LoginTimeout(str(exc)) from exc
+
+    def load_visit_record_page(self, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
+        self._ensure_started()
+        try:
+            return wait_for_visit_record_data(self._page, timeout_ms=timeout_ms).status
+        except PlaywrightTimeoutError as exc:
+            raise DriverError(str(exc)) from exc
+
+    def submit_record(self, record, before_submit=None):
+        self._ensure_started()
+        page = self._page
+        dialog = None
+        try:
+            dialog = open_new_record_dialog(page)
+            fill_visit_record_form(page, dialog, record)
+            if before_submit is not None:
+                before_submit()
+            return submit_visit_record(page, dialog, record)
+        except RecordSkipped:
+            if dialog is not None:
+                close_visit_dialog(page)
+            raise
+        except PlaywrightTimeoutError as exc:
+            if dialog is not None:
+                close_visit_dialog(page)
+            raise DriverError(str(exc)) from exc
+
+    def close(self):
+        if self._browser is not None:
+            self._browser.close()
+            self._browser = None
+        if self._playwright is not None:
+            self._playwright.stop()
+            self._playwright = None
+        self._page = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
+class FakeVisitRecordDriver:
+    """内存假驱动：模拟登录成功、平台加载返回 200、每条记录提交成功。
+
+    用于 --fake-browser：在无桌面会话的服务器上把 xlsx -> 台账 -> TUI 的完整
+    流程跑一遍供人工核对，不启动浏览器。构造函数暴露少量钩子，供测试或临时
+    python -c 脚本驱动失败/跳过路径。
+    """
+
+    def __init__(
+        self,
+        skip_names=(),
+        fail_names=(),
+        submit_log=None,
+        login_delay=1.0,
+        load_delay=0.5,
+        submit_delay=0.2,
+    ):
+        # skip_names:  走访对象 在此集合中的记录抛 RecordSkipped（模拟“找不到走访对象”）。
+        # fail_names:  走访对象 在此集合中的记录提交返回 False（模拟服务端拒绝）。
+        # submit_log:  成功提交的记录 dict 追加到此列表，供测试检查。
+        # 三个 delay 让 TUI 的 spinner/进度条有肉眼可见的推进。
+        self._skip_names = set(skip_names)
+        self._fail_names = set(fail_names)
+        self._submitted = submit_log if submit_log is not None else []
+        self._login_delay = login_delay
+        self._load_delay = load_delay
+        self._submit_delay = submit_delay
+
+    def login(self, timeout_seconds=LOGIN_TIMEOUT_SECONDS):
+        time.sleep(self._login_delay)
+        # 任意不含 LOGIN_HASH 的 URL，模拟登录成功后的跳转。
+        return "https://jczl.sh.cegn.cn/web/#/home"
+
+    def load_visit_record_page(self, timeout_ms=PAGE_LOAD_TIMEOUT_MS):
+        time.sleep(self._load_delay)
+        return 200
+
+    def submit_record(self, record, before_submit=None):
+        name = record.get("走访对象", "")
+        if name in self._skip_names:
+            raise RecordSkipped(f"走访对象 {name} 未找到（fake），跳过该条记录")
+        if before_submit is not None:
+            before_submit()
+        if name in self._fail_names:
+            return False
+        time.sleep(self._submit_delay)
+        self._submitted.append(record)
+        return True
+
+    def close(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
+def create_driver(args):
+    """按 args 返回一个 VisitRecordDriver；--fake-browser 选择内存假实现。"""
+    if args.fake_browser:
+        return FakeVisitRecordDriver()
+    return PlaywrightVisitRecordDriver(headless=False)
+
+
 def main():
     ui = AppUI()
     ui.setup_logging(logger)
@@ -720,7 +928,12 @@ def main():
 
             # 去重台账必须在打开浏览器前初始化：台账不可用时直接失败，绝不降级为“无台账”
             # 运行（那会悄悄重新引入本功能要避免的重复）。
-            ledger_path = os.path.join(os.path.expanduser("~"), LEDGER_DB_NAME)
+            # --fake-browser 时用内存台账，避免假提交污染真实去重库。
+            ledger_path = (
+                ":memory:"
+                if args.fake_browser
+                else os.path.join(os.path.expanduser("~"), LEDGER_DB_NAME)
+            )
             logger.info("正在初始化去重台账...")
             ui.set_status("正在初始化去重台账...")
             try:
@@ -731,26 +944,22 @@ def main():
 
             logger.info("正在启动浏览器...")
             ui.set_status("正在启动浏览器...")
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=False)
-                page = browser.new_page()
-                page.goto(LOGIN_URL)
+            with create_driver(args) as driver:
 
                 logger.info("请在浏览器中扫描二维码完成登录 ...")
                 ui.set_status("请在浏览器中扫描二维码完成登录 ...")
                 try:
-                    final_url = wait_for_login_redirect(page)
-                except PlaywrightTimeoutError as exc:
+                    final_url = driver.login()
+                except LoginTimeout as exc:
                     logger.error(str(exc))
-                    browser.close()
                     sys.exit(1)
 
                 logger.info(f"登录成功，已跳转到: {final_url}")
                 ui.set_status(f"登录成功，已跳转到: {final_url}")
 
                 ui.set_status("正在加载走访登记平台...")
-                resp = wait_for_visit_record_data(page)
-                logger.info(f"已进入平台，{DATA_API} 返回状态码: {resp.status}")
+                status = driver.load_visit_record_page()
+                logger.info(f"已进入平台，{DATA_API} 返回状态码: {status}")
 
                 ui.begin_processing(len(records))
 
@@ -767,15 +976,17 @@ def main():
                         )
                         ui.advance(i)
                         continue
-                    dialog = open_new_record_dialog(page)
                     try:
-                        fill_visit_record_form(page, dialog, record)
-                        if args.confirm:
-                            ui.pause(
-                                f"已填写第 {i}/{len(records)} 条记录，"
-                                f"请检查表单，按回车提交并继续..."
-                            )
-                        if submit_visit_record(page, dialog, record):
+                        ok = driver.submit_record(
+                            record,
+                            before_submit=(
+                                (lambda i=i: ui.pause(
+                                    f"已填写第 {i}/{len(records)} 条记录，"
+                                    f"请检查表单，按回车提交并继续..."))
+                                if args.confirm else None
+                            ),
+                        )
+                        if ok:
                             ledger.add(record)
                             success_count += 1
                         else:
@@ -783,11 +994,9 @@ def main():
                     except RecordSkipped as exc:
                         failed_count += 1
                         logger.error(str(exc))
-                        close_visit_dialog(page)
-                    except PlaywrightTimeoutError as exc:
+                    except DriverError as exc:
                         failed_count += 1
                         logger.error(str(exc))
-                        close_visit_dialog(page)
                     ui.advance(i)
 
                 ledger.close()
@@ -799,7 +1008,6 @@ def main():
                 logger.info(summary)
                 ui.show_completed(summary)
                 ui.pause("浏览器保持打开供检查，按回车退出...")
-                browser.close()
     finally:
         ui.close()
 
