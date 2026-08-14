@@ -22,6 +22,11 @@ Install the requirements by `pip install -r requirements.txt`:
   added after it (e.g. `live.update` on a `get_renderable` Live, `Task`-level
   wait helpers).
 
+- A desktop session: the script drives a **visible** browser (the user scans a
+  QR code on screen), so it must run on a machine with a display. Don't run the
+  real browser against the server from a headless box — there is no screen for
+  the QR code and no place for the browser to render.
+
 ## Usage
 
 ```bash
